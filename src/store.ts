@@ -27,7 +27,7 @@ export function parseRelativeTime(input: string): number {
   return now - 24 * 60 * 60 * 1000;
 }
 
-function getMessageTimestamp(msg: WAMessage): number {
+export function getMessageTimestamp(msg: WAMessage): number {
   const ts = msg.messageTimestamp;
   if (typeof ts === 'number') return ts * 1000;
   if (typeof ts === 'string') return parseInt(ts) * 1000;
@@ -80,6 +80,7 @@ export interface FormattedMessage {
   id: string;
   sender_jid: string;
   sender_name: string;
+  from_me: boolean;
   content: string | null;
   type: string;
   timestamp: string;
@@ -92,6 +93,7 @@ function formatMessage(msg: WAMessage): FormattedMessage {
     id: msg.key.id || '',
     sender_jid: getSenderJid(msg),
     sender_name: getSenderName(msg),
+    from_me: msg.key.fromMe === true,
     content: getMessageContent(msg),
     type: getMessageType(msg),
     timestamp: new Date(ts).toISOString(),

@@ -23,6 +23,20 @@ import {
   sendMessageSchema,
   sendMessage,
 } from './tools/send.js';
+import {
+  listContactsSchema,
+  listContacts,
+} from './tools/contacts.js';
+import {
+  fetchPrivateMessagesSchema,
+  fetchPrivateMessages,
+  sendPrivateMessageSchema,
+  sendPrivateMessage,
+} from './tools/private-messages.js';
+import {
+  searchMemberInGroupsSchema,
+  searchMemberInGroups,
+} from './tools/search-member.js';
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -54,6 +68,8 @@ export function createMcpServer(): McpServer {
               status: state,
               groups_cached: Object.keys(groupCache).filter((k) => k.endsWith('@g.us')).length,
               conversations_in_store: messageJids.length,
+              group_chats_in_store: messageJids.filter((jid) => jid.endsWith('@g.us')).length,
+              personal_chats_in_store: messageJids.filter((jid) => jid.endsWith('@s.whatsapp.net')).length,
               total_messages_in_store: totalMessages,
             }, null, 2),
           },
@@ -157,6 +173,43 @@ export function createMcpServer(): McpServer {
     sendMessageSchema.shape,
     async (params) => ({
       content: [{ type: 'text' as const, text: JSON.stringify(await sendMessage(params), null, 2) }],
+    })
+  );
+
+  // Contacts / Private Messages
+  server.tool(
+    'list_contacts',
+    'List all personal/direct WhatsApp conversations with phone number, name, and message count',
+    listContactsSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(listContacts(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'fetch_private_messages',
+    'Get messages from a personal/direct WhatsApp conversation. Takes phone number or JID.',
+    fetchPrivateMessagesSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(fetchPrivateMessages(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'send_private_message',
+    'Send a text message to a personal WhatsApp contact. Takes phone number or JID.',
+    sendPrivateMessageSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendPrivateMessage(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'search_member_in_groups',
+    'Search which WhatsApp groups a specific contact appears in. Search by phone number, name, or both.',
+    searchMemberInGroupsSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(searchMemberInGroups(params), null, 2) }],
     })
   );
 

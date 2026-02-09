@@ -1,0 +1,164 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { getConnectionState, getMessageStore, getGroupCache, getStoreCount, requestMessageHistory } from './whatsapp.js';
+import {
+  listGroupsSchema,
+  listGroups,
+  getGroupInfoSchema,
+  getGroupInfo,
+} from './tools/groups.js';
+import {
+  fetchMessagesSchema,
+  fetchMessages,
+  searchMessagesSchema,
+  searchMessages,
+} from './tools/messages.js';
+import {
+  getGroupStatsSchema,
+  getGroupStats,
+  getMemberStatsSchema,
+  getMemberStats,
+} from './tools/stats.js';
+import {
+  sendMessageSchema,
+  sendMessage,
+} from './tools/send.js';
+
+export function createMcpServer(): McpServer {
+  const server = new McpServer({
+    name: 'whatsapp-mcp',
+    version: '1.0.0',
+  });
+
+  // Connection status
+  server.tool(
+    'connection_status',
+    'Returns WhatsApp connection status, store size, and group count',
+    {},
+    async () => {
+      const state = getConnectionState();
+      const store = getMessageStore();
+      const groupCache = getGroupCache();
+
+      const messageJids = Object.keys(store);
+      let totalMessages = 0;
+      for (const jid of messageJids) {
+        totalMessages += (store[jid] || []).length;
+      }
+
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify({
+              status: state,
+              groups_cached: Object.keys(groupCache).filter((k) => k.endsWith('@g.us')).length,
+              conversations_in_store: messageJids.length,
+              total_messages_in_store: totalMessages,
+            }, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  // Groups
+  server.tool(
+    'list_groups',
+    'List all WhatsApp groups with name, JID, participant count, and message count',
+    listGroupsSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(listGroups(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'get_group_info',
+    'Get detailed info for a group: members, admins, description, creation date',
+    getGroupInfoSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(getGroupInfo(params), null, 2) }],
+    })
+  );
+
+  // Messages
+  server.tool(
+    'fetch_messages',
+    'Get messages from a group. Supports relative time (24h, 7d, 2w) or ISO dates',
+    fetchMessagesSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(fetchMessages(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'search_messages',
+    'Full-text search across messages. Optionally filter by group and time range',
+    searchMessagesSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(searchMessages(params), null, 2) }],
+    })
+  );
+
+  // Stats
+  server.tool(
+    'get_group_stats',
+    'Message counts, top contributors, hourly/daily activity, media breakdown for a group',
+    getGroupStatsSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(getGroupStats(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'get_member_stats',
+    'Per-member stats: message count, media count, active hours',
+    getMemberStatsSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(getMemberStats(params), null, 2) }],
+    })
+  );
+
+  // Request history
+  server.tool(
+    'request_history',
+    'Request older messages for a group from WhatsApp servers. Needs at least one message already in store as anchor. Results arrive asynchronously via history sync.',
+    {
+      group_jid: z.string().describe('The group JID (e.g., 123456789@g.us)'),
+      count: z.number().default(500).describe('Number of messages to request (default 500)'),
+    },
+    async (params) => {
+      try {
+        const before = (getMessageStore()[params.group_jid] || []).length;
+        const requestId = await requestMessageHistory(params.group_jid, params.count);
+        return {
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              status: 'requested',
+              request_id: requestId,
+              messages_before_request: before,
+              note: 'Messages will arrive asynchronously. Check fetch_messages again in a few seconds.',
+            }, null, 2),
+          }],
+        };
+      } catch (err: any) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: err.message }, null, 2) }],
+        };
+      }
+    }
+  );
+
+  // Send
+  server.tool(
+    'send_message',
+    'Send a text message to a WhatsApp group',
+    sendMessageSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendMessage(params), null, 2) }],
+    })
+  );
+
+  return server;
+}

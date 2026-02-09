@@ -73,6 +73,27 @@ import {
   starMessageSchema,
   starMessage,
 } from './tools/interactions.js';
+import {
+  addNoteSchema, addNoteHandler,
+  getNotesSchema, getNotesHandler,
+  searchNotesSchema, searchNotesHandler,
+  deleteNoteSchema, deleteNoteHandler,
+  addTagsSchema, addTagsHandler,
+  removeTagsSchema, removeTagsHandler,
+  getByTagSchema, getByTagHandler,
+  listTagsSchema, listTagsHandler,
+  setMetadataSchema, setMetadataHandler,
+  getProfileSchema, getProfileHandler,
+  setFollowUpSchema, setFollowUpHandler,
+  logInteractionSchema, logInteractionHandler,
+  addReminderSchema, addReminderHandler,
+  listRemindersSchema, listRemindersHandler,
+  checkDueRemindersSchema, checkDueRemindersHandler,
+  completeReminderSchema, completeReminderHandler,
+  cancelReminderSchema, cancelReminderHandler,
+  searchCRMSchema, searchCRMHandler,
+  crmOverviewSchema, crmOverviewHandler,
+} from './tools/crm-tools.js';
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -417,6 +438,184 @@ export function createMcpServer(): McpServer {
     starMessageSchema.shape,
     async (params) => ({
       content: [{ type: 'text' as const, text: JSON.stringify(await starMessage(params), null, 2) }],
+    })
+  );
+
+  // ==================== CRM TOOLS ====================
+
+  // Notes
+  server.tool(
+    'crm_add_note',
+    'Save a note about a contact or a global note. Use for remembering things like "אופיר חייב לי 50 שקל" or meeting notes.',
+    addNoteSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await addNoteHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_get_notes',
+    'Get all notes for a contact or global notes.',
+    getNotesSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await getNotesHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_search_notes',
+    'Search through all notes (contact and global) by text.',
+    searchNotesSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await searchNotesHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_delete_note',
+    'Delete a note by its ID.',
+    deleteNoteSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await deleteNoteHandler(params), null, 2) }],
+    })
+  );
+
+  // Tags
+  server.tool(
+    'crm_add_tags',
+    'Add tags to a contact for categorization (e.g. "friend", "work", "lead", "family", "vip").',
+    addTagsSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await addTagsHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_remove_tags',
+    'Remove tags from a contact.',
+    removeTagsSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await removeTagsHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_get_by_tag',
+    'Get all contacts with a specific tag (e.g. all "work" contacts).',
+    getByTagSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await getByTagHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_list_tags',
+    'List all tags and how many contacts each tag has.',
+    listTagsSchema.shape,
+    async () => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await listTagsHandler(), null, 2) }],
+    })
+  );
+
+  // Contact metadata
+  server.tool(
+    'crm_set_metadata',
+    'Set metadata on a contact (birthday, company, role, email, or any custom field).',
+    setMetadataSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await setMetadataHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_get_profile',
+    'Get full CRM profile of a contact: tags, notes, metadata, follow-up date, last interaction.',
+    getProfileSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await getProfileHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_set_follow_up',
+    'Set a follow-up date for a contact (e.g. "call back next week").',
+    setFollowUpSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await setFollowUpHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_log_interaction',
+    'Log that you interacted with a contact (updates last_interaction timestamp).',
+    logInteractionSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await logInteractionHandler(params), null, 2) }],
+    })
+  );
+
+  // Reminders
+  server.tool(
+    'crm_add_reminder',
+    'Create a reminder for a future date. Optionally specify a WhatsApp message to send when due.',
+    addReminderSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await addReminderHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_list_reminders',
+    'List all reminders, optionally filtered by status (pending/done/cancelled).',
+    listRemindersSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await listRemindersHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_check_due',
+    'Check for reminders that are due now (past their due date and still pending).',
+    checkDueRemindersSchema.shape,
+    async () => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await checkDueRemindersHandler(), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_complete_reminder',
+    'Mark a reminder as done.',
+    completeReminderSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await completeReminderHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_cancel_reminder',
+    'Cancel a reminder.',
+    cancelReminderSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await cancelReminderHandler(params), null, 2) }],
+    })
+  );
+
+  // Search & Overview
+  server.tool(
+    'crm_search',
+    'Search CRM contacts by name, phone, tag, metadata value, or note content.',
+    searchCRMSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await searchCRMHandler(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'crm_overview',
+    'Get a full CRM dashboard: total contacts, notes, reminders, tags, recent interactions, upcoming follow-ups.',
+    crmOverviewSchema.shape,
+    async () => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await crmOverviewHandler(), null, 2) }],
     })
   );
 

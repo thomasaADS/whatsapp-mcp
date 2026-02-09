@@ -101,6 +101,13 @@ function formatMessage(msg: WAMessage): FormattedMessage {
   };
 }
 
+export function getRawMessage(jid: string, messageId: string): WAMessage | null {
+  const store = getMessageStore();
+  const messages = store[jid];
+  if (!messages) return null;
+  return messages.find((m) => m.key.id === messageId) || null;
+}
+
 export function getMessagesForGroup(
   jid: string,
   since: string = '24h',

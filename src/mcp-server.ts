@@ -47,6 +47,10 @@ import {
   sendMediaPrivateSchema,
   sendMediaPrivate,
 } from './tools/send-media.js';
+import {
+  downloadMediaSchema,
+  downloadMedia,
+} from './tools/read-media.js';
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -259,6 +263,37 @@ export function createMcpServer(): McpServer {
     async (params) => ({
       content: [{ type: 'text' as const, text: JSON.stringify(await sendMediaPrivate(params), null, 2) }],
     })
+  );
+
+  // Download / Read Media
+  server.tool(
+    'download_media',
+    'Download and read media (image, video, sticker, audio, document) from a WhatsApp message. Returns base64 data that Claude can view. Use fetch_messages first to find the message_id of an image message.',
+    downloadMediaSchema.shape,
+    async (params) => {
+      const result = await downloadMedia(params);
+      if ('error' in result) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        };
+      }
+      // Return image directly so Claude can see it
+      const contents: any[] = [];
+      if (result.mimetype?.startsWith('image/')) {
+        contents.push({
+          type: 'image' as const,
+          data: result.base64,
+          mimeType: result.mimetype,
+        });
+      }
+      // Always include text metadata
+      const { base64, ...meta } = result;
+      contents.push({
+        type: 'text' as const,
+        text: JSON.stringify({ ...meta, base64_length: result.base64.length }, null, 2),
+      });
+      return { content: contents };
+    }
   );
 
   return server;

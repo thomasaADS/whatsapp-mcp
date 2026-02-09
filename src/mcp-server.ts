@@ -51,6 +51,28 @@ import {
   downloadMediaSchema,
   downloadMedia,
 } from './tools/read-media.js';
+import {
+  sendReactionSchema,
+  sendReaction,
+  replyMessageSchema,
+  replyMessage,
+  markReadSchema,
+  markRead,
+  forwardMessageSchema,
+  forwardMessage,
+  sendPollSchema,
+  sendPoll,
+  sendLocationSchema,
+  sendLocation,
+  sendContactSchema,
+  sendContact,
+  getProfilePicSchema,
+  getProfilePic,
+  deleteMessageSchema,
+  deleteMessage,
+  starMessageSchema,
+  starMessage,
+} from './tools/interactions.js';
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -294,6 +316,108 @@ export function createMcpServer(): McpServer {
       });
       return { content: contents };
     }
+  );
+
+  // ==================== INTERACTION TOOLS ====================
+
+  // React to message
+  server.tool(
+    'send_reaction',
+    'React to a WhatsApp message with an emoji (😂, ❤️, 👍, etc). Send empty string to remove reaction.',
+    sendReactionSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendReaction(params), null, 2) }],
+    })
+  );
+
+  // Reply / Quote message
+  server.tool(
+    'reply_message',
+    'Reply to a specific WhatsApp message (quote). The reply will appear as a quoted reply in the chat.',
+    replyMessageSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await replyMessage(params), null, 2) }],
+    })
+  );
+
+  // Mark as read
+  server.tool(
+    'mark_read',
+    'Mark a WhatsApp chat or specific message as read (blue ticks).',
+    markReadSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await markRead(params), null, 2) }],
+    })
+  );
+
+  // Forward message
+  server.tool(
+    'forward_message',
+    'Forward a message from one chat to another (group or private).',
+    forwardMessageSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await forwardMessage(params), null, 2) }],
+    })
+  );
+
+  // Send poll
+  server.tool(
+    'send_poll',
+    'Create and send a poll in a WhatsApp chat. Supports 2-12 options, single or multi-select.',
+    sendPollSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendPoll(params), null, 2) }],
+    })
+  );
+
+  // Send location
+  server.tool(
+    'send_location',
+    'Send a location pin to a WhatsApp chat with coordinates, name, and address.',
+    sendLocationSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendLocation(params), null, 2) }],
+    })
+  );
+
+  // Send contact card
+  server.tool(
+    'send_contact',
+    'Send a contact card (vCard) to a WhatsApp chat with name and phone number.',
+    sendContactSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendContact(params), null, 2) }],
+    })
+  );
+
+  // Get profile picture
+  server.tool(
+    'get_profile_pic',
+    'Get the profile picture URL of a WhatsApp contact or group.',
+    getProfilePicSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await getProfilePic(params), null, 2) }],
+    })
+  );
+
+  // Delete message
+  server.tool(
+    'delete_message',
+    'Delete a message from a WhatsApp chat. Can delete for me only or for everyone (own recent messages only).',
+    deleteMessageSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await deleteMessage(params), null, 2) }],
+    })
+  );
+
+  // Star message
+  server.tool(
+    'star_message',
+    'Star or unstar a WhatsApp message for quick access later.',
+    starMessageSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await starMessage(params), null, 2) }],
+    })
   );
 
   return server;

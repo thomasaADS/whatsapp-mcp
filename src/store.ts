@@ -76,6 +76,13 @@ function getSenderName(msg: WAMessage): string {
   return msg.pushName || getSenderJid(msg).split('@')[0];
 }
 
+export interface QuotedInfo {
+  id: string;
+  sender_jid: string;
+  content: string | null;
+  type: string;
+}
+
 export interface FormattedMessage {
   id: string;
   sender_jid: string;
@@ -85,11 +92,47 @@ export interface FormattedMessage {
   type: string;
   timestamp: string;
   timestamp_epoch: number;
+  quoted?: QuotedInfo;
+}
+
+function getQuotedInfo(msg: WAMessage): QuotedInfo | undefined {
+  const m = msg.message;
+  if (!m) return undefined;
+
+  // contextInfo contains the quoted message
+  const ctx =
+    m.extendedTextMessage?.contextInfo ||
+    m.imageMessage?.contextInfo ||
+    m.videoMessage?.contextInfo ||
+    m.audioMessage?.contextInfo ||
+    m.documentMessage?.contextInfo ||
+    m.stickerMessage?.contextInfo;
+
+  if (!ctx?.quotedMessage || !ctx.stanzaId) return undefined;
+
+  const qm = ctx.quotedMessage;
+  let content: string | null = null;
+  let type = 'unknown';
+
+  if (qm.conversation) { content = qm.conversation; type = 'text'; }
+  else if (qm.extendedTextMessage?.text) { content = qm.extendedTextMessage.text; type = 'text'; }
+  else if (qm.imageMessage) { content = qm.imageMessage.caption || null; type = 'image'; }
+  else if (qm.videoMessage) { content = qm.videoMessage.caption || null; type = 'video'; }
+  else if (qm.audioMessage) { type = 'audio'; }
+  else if (qm.documentMessage) { content = qm.documentMessage.caption || null; type = 'document'; }
+  else if (qm.stickerMessage) { type = 'sticker'; }
+
+  return {
+    id: ctx.stanzaId,
+    sender_jid: ctx.participant || 'unknown',
+    content,
+    type,
+  };
 }
 
 function formatMessage(msg: WAMessage): FormattedMessage {
   const ts = getMessageTimestamp(msg);
-  return {
+  const result: FormattedMessage = {
     id: msg.key.id || '',
     sender_jid: getSenderJid(msg),
     sender_name: getSenderName(msg),
@@ -99,6 +142,9 @@ function formatMessage(msg: WAMessage): FormattedMessage {
     timestamp: new Date(ts).toISOString(),
     timestamp_epoch: ts,
   };
+  const quoted = getQuotedInfo(msg);
+  if (quoted) result.quoted = quoted;
+  return result;
 }
 
 export function getRawMessage(jid: string, messageId: string): WAMessage | null {

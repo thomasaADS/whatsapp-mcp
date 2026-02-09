@@ -37,6 +37,16 @@ import {
   searchMemberInGroupsSchema,
   searchMemberInGroups,
 } from './tools/search-member.js';
+import {
+  sendImageSchema,
+  sendImage,
+  sendImagePrivateSchema,
+  sendImagePrivate,
+  sendMediaSchema,
+  sendMedia,
+  sendMediaPrivateSchema,
+  sendMediaPrivate,
+} from './tools/send-media.js';
 
 export function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -210,6 +220,44 @@ export function createMcpServer(): McpServer {
     searchMemberInGroupsSchema.shape,
     async (params) => ({
       content: [{ type: 'text' as const, text: JSON.stringify(searchMemberInGroups(params), null, 2) }],
+    })
+  );
+
+  // Send Image
+  server.tool(
+    'send_image',
+    'Send an image to a WhatsApp group. Provide either a URL or local file path.',
+    sendImageSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendImage(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'send_image_private',
+    'Send an image to a personal WhatsApp contact. Provide either a URL or local file path.',
+    sendImagePrivateSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendImagePrivate(params), null, 2) }],
+    })
+  );
+
+  // Send Media (video, audio, document, sticker)
+  server.tool(
+    'send_media',
+    'Send media (video, audio, document, sticker) to a WhatsApp group. Provide either a URL or local file path.',
+    sendMediaSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendMedia(params), null, 2) }],
+    })
+  );
+
+  server.tool(
+    'send_media_private',
+    'Send media (video, audio, document, sticker) to a personal WhatsApp contact. Provide either a URL or local file path.',
+    sendMediaPrivateSchema.shape,
+    async (params) => ({
+      content: [{ type: 'text' as const, text: JSON.stringify(await sendMediaPrivate(params), null, 2) }],
     })
   );
 

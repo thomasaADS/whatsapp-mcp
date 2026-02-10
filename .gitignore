@@ -1,7 +1,11 @@
 node_modules/
 dist/
 auth_info/
+auth_info_agent_*/
 store/
 *.log
 .DS_Store
-.claude/settings.local.json
+.env
+.claude/
+temp-*.ts
+start-dashboard.ts

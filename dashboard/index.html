@@ -1,491 +1,275 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>טד CRM - דשבורד</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0a0a0f;
-      color: #e0e0e0;
-      min-height: 100vh;
-    }
-
-    .header {
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      padding: 20px 30px;
-      border-bottom: 1px solid #2a2a4a;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .header h1 {
-      font-size: 24px;
-      color: #fff;
-    }
-
-    .header h1 span { color: #00d4aa; }
-
-    .header .refresh-btn {
-      background: #00d4aa;
-      color: #0a0a0f;
-      border: none;
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
-      font-size: 14px;
-    }
-
-    .header .refresh-btn:hover { background: #00f0c0; }
-
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      padding: 20px 30px;
-    }
-
-    .stat-card {
-      background: linear-gradient(135deg, #1a1a2e, #1e1e3a);
-      border: 1px solid #2a2a4a;
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-    }
-
-    .stat-card .number {
-      font-size: 36px;
-      font-weight: bold;
-      color: #00d4aa;
-    }
-
-    .stat-card .label {
-      font-size: 13px;
-      color: #888;
-      margin-top: 4px;
-    }
-
-    .main-content {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      padding: 0 30px 30px;
-    }
-
-    @media (max-width: 900px) {
-      .main-content { grid-template-columns: 1fr; }
-    }
-
-    .panel {
-      background: linear-gradient(135deg, #1a1a2e, #1e1e3a);
-      border: 1px solid #2a2a4a;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid #2a2a4a;
-      font-size: 16px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .panel-body {
-      padding: 16px 20px;
-      max-height: 500px;
-      overflow-y: auto;
-    }
-
-    .panel-body::-webkit-scrollbar { width: 6px; }
-    .panel-body::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-
-    .activity-item {
-      display: flex;
-      gap: 12px;
-      padding: 12px 0;
-      border-bottom: 1px solid #1a1a2e;
-    }
-
-    .activity-item:last-child { border-bottom: none; }
-
-    .activity-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 16px;
-      flex-shrink: 0;
-    }
-
-    .activity-icon.note { background: #1e3a5f; }
-    .activity-icon.reminder { background: #3a1e5f; }
-    .activity-icon.interaction { background: #1e5f3a; }
-    .activity-icon.tags { background: #5f3a1e; }
-    .activity-icon.global_note { background: #3a3a1e; }
-
-    .activity-content { flex: 1; }
-    .activity-content .name { font-weight: bold; color: #00d4aa; font-size: 14px; }
-    .activity-content .text { color: #ccc; font-size: 13px; margin-top: 2px; }
-    .activity-content .time { color: #666; font-size: 11px; margin-top: 4px; }
-
-    .contact-item {
-      padding: 12px 0;
-      border-bottom: 1px solid #1a1a2e;
-    }
-
-    .contact-item:last-child { border-bottom: none; }
-
-    .contact-name {
-      font-weight: bold;
-      color: #fff;
-      font-size: 15px;
-    }
-
-    .contact-phone {
-      color: #666;
-      font-size: 12px;
-    }
-
-    .contact-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      margin-top: 6px;
-    }
-
-    .tag {
-      background: #00d4aa22;
-      color: #00d4aa;
-      padding: 2px 10px;
-      border-radius: 12px;
-      font-size: 11px;
-      border: 1px solid #00d4aa44;
-    }
-
-    .contact-meta {
-      color: #888;
-      font-size: 12px;
-      margin-top: 4px;
-    }
-
-    .contact-notes-count {
-      color: #666;
-      font-size: 11px;
-    }
-
-    .reminder-item {
-      padding: 10px 0;
-      border-bottom: 1px solid #1a1a2e;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .reminder-item:last-child { border-bottom: none; }
-
-    .reminder-text { font-size: 14px; color: #ccc; }
-    .reminder-due { font-size: 11px; color: #888; }
-
-    .reminder-status {
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-size: 11px;
-    }
-
-    .reminder-status.pending { background: #f0ad4e33; color: #f0ad4e; }
-    .reminder-status.done { background: #00d4aa33; color: #00d4aa; }
-    .reminder-status.cancelled { background: #ff444433; color: #ff4444; }
-
-    .tags-panel .tag-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 8px 0;
-      border-bottom: 1px solid #1a1a2e;
-    }
-
-    .tags-panel .tag-name { color: #00d4aa; font-size: 14px; }
-    .tags-panel .tag-count { color: #666; font-size: 13px; }
-
-    .empty-state {
-      text-align: center;
-      color: #555;
-      padding: 40px 20px;
-      font-size: 14px;
-    }
-
-    .full-width { grid-column: 1 / -1; }
-
-    .search-box {
-      width: 100%;
-      padding: 10px 16px;
-      background: #0a0a15;
-      border: 1px solid #2a2a4a;
-      border-radius: 8px;
-      color: #e0e0e0;
-      font-size: 14px;
-      margin-bottom: 12px;
-    }
-
-    .search-box::placeholder { color: #555; }
-    .search-box:focus { outline: none; border-color: #00d4aa; }
-  </style>
+  <title>Ted - Command Center</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23f59e0b'/><text x='50' y='68' text-anchor='middle' font-size='52' font-weight='bold' fill='%2309090b'>T</text></svg>">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="header">
-    <h1>🤖 <span>טד</span> CRM דשבורד</h1>
-    <button class="refresh-btn" onclick="loadAll()">🔄 רענן</button>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="brand-logo">T</div>
+      <div class="brand-text">
+        <span class="brand-name">Ted</span>
+        <span class="brand-subtitle">Command Center</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-secondary btn-sm" onclick="openAgentPanel()" title="Manage Agents">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        New Agent
+      </button>
+      <div class="status-badge">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Connecting...</span>
+      </div>
+      <button class="btn-icon" onclick="location.reload()" title="Refresh">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- STATS ROW -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-icon blue">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-value" id="stat-contacts">0</div>
+        <div class="stat-label">CRM Contacts</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-value" id="stat-notes">0</div>
+        <div class="stat-label">Notes</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon amber">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-value" id="stat-reminders">0</div>
+        <div class="stat-label">Reminders</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon red">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-value" id="stat-due">0</div>
+        <div class="stat-label">Overdue</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon purple">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-value" id="stat-tags">0</div>
+        <div class="stat-label">Tags</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon cyan">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div class="stat-info">
+        <div class="stat-value" id="stat-messages">0</div>
+        <div class="stat-label">Messages</div>
+      </div>
+    </div>
   </div>
 
-  <div class="stats-row" id="stats-row">
-    <div class="stat-card"><div class="number" id="stat-contacts">-</div><div class="label">אנשי קשר</div></div>
-    <div class="stat-card"><div class="number" id="stat-notes">-</div><div class="label">הערות</div></div>
-    <div class="stat-card"><div class="number" id="stat-reminders">-</div><div class="label">תזכורות פעילות</div></div>
-    <div class="stat-card"><div class="number" id="stat-due">-</div><div class="label">תזכורות שהגיע הזמן</div></div>
-    <div class="stat-card"><div class="number" id="stat-tags">-</div><div class="label">תגיות</div></div>
-  </div>
+  <!-- MAIN LAYOUT -->
+  <div class="main-layout">
 
-  <div class="main-content">
-    <!-- Activity Feed -->
-    <div class="panel">
-      <div class="panel-header">📋 פעילות אחרונה</div>
-      <div class="panel-body" id="activity-feed">
-        <div class="empty-state">טוען...</div>
+    <!-- LEFT SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-tabs">
+        <button class="sidebar-tab active" data-tab="groups" onclick="switchTab('groups')">Groups</button>
+        <button class="sidebar-tab" data-tab="contacts" onclick="switchTab('contacts')">Contacts</button>
+        <button class="sidebar-tab" data-tab="crm" onclick="switchTab('crm')">CRM</button>
+      </div>
+      <div class="sidebar-search">
+        <div class="sidebar-search-wrap">
+          <span class="search-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </span>
+          <input type="text" id="sidebar-search-input" placeholder="Search..." oninput="renderSidebar()">
+        </div>
+      </div>
+      <div class="sidebar-list" id="sidebar-list">
+        <div class="empty-state">Loading...</div>
       </div>
     </div>
 
-    <!-- Contacts -->
-    <div class="panel">
-      <div class="panel-header">👥 אנשי קשר</div>
-      <div class="panel-body">
-        <input type="text" class="search-box" placeholder="🔍 חפש איש קשר..." oninput="filterContacts(this.value)">
-        <div id="contacts-list">
-          <div class="empty-state">טוען...</div>
+    <!-- CENTER - MESSAGE FEED -->
+    <div class="center-panel">
+      <div class="feed-header">
+        <div class="feed-target" id="composer-target">Select a group or contact</div>
+        <select id="feed-period" onchange="loadMessages()">
+          <option value="1h">1 Hour</option>
+          <option value="24h" selected>24 Hours</option>
+          <option value="7d">1 Week</option>
+          <option value="30d">1 Month</option>
+        </select>
+      </div>
+      <div class="feed" id="feed-body">
+        <div class="empty-state">
+          <div class="empty-state-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          Select a group or contact to view messages
+        </div>
+      </div>
+      <!-- Composer -->
+      <div class="composer-bar" style="position: relative;">
+        <div class="quick-replies-popup" id="qr-popup"></div>
+        <button class="btn-mode" id="btn-send-as" onclick="toggleSendAs()" title="Switch: You / Ted">You</button>
+        <textarea id="msg-text" placeholder="Write a message... (type / for quick replies)" rows="1" onkeydown="handleComposerKey(event)" oninput="handleComposerInput(event)"></textarea>
+        <button class="btn-send-msg" id="btn-send" onclick="sendTextMessage()" title="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+      <div class="right-tabs">
+        <button class="right-tab active" data-rtab="crm" onclick="switchRightTab('crm')">CRM</button>
+        <button class="right-tab" data-rtab="tools" onclick="switchRightTab('tools')">Tools</button>
+      </div>
+
+      <!-- CRM Content -->
+      <div class="right-content" id="right-crm" style="display: flex;">
+        <div class="crm-panel-body" id="crm-panel-body">
+          <div class="empty-state">
+            <div class="empty-state-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            </div>
+            Select a contact to view CRM profile
+          </div>
+        </div>
+      </div>
+
+      <!-- Tools Content -->
+      <div class="right-content" id="right-tools" style="display: none;">
+        <div class="tools-body">
+          <!-- AI Image Generator -->
+          <div class="tool-card">
+            <div class="tool-card-header">
+              <div class="tool-card-icon purple">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              </div>
+              <div class="tool-card-title">AI Image Generator</div>
+            </div>
+            <div class="ai-input-wrap">
+              <input type="text" id="ai-prompt" placeholder="Describe an image..." onkeypress="if(event.key==='Enter')generateImage()">
+            </div>
+            <div class="ai-actions">
+              <button class="btn btn-secondary btn-sm" onclick="generateImage()">Generate</button>
+              <button class="btn btn-primary btn-sm" id="btn-send-image" onclick="sendAiImage()" disabled>Send Image</button>
+            </div>
+            <div class="ai-preview" id="ai-preview"></div>
+          </div>
+
+          <!-- Quick Replies Manager -->
+          <div class="tool-card">
+            <div class="tool-card-header">
+              <div class="tool-card-icon cyan">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <div class="tool-card-title">Quick Replies</div>
+            </div>
+            <div id="qr-manage-list" class="qr-manage-list"></div>
+            <div class="inline-add" style="flex-wrap: wrap;">
+              <input type="text" id="qr-new-shortcut" placeholder="Shortcut" style="max-width: 90px;" onkeypress="if(event.key==='Enter')document.getElementById('qr-new-text').focus()">
+              <input type="text" id="qr-new-text" placeholder="Reply text..." onkeypress="if(event.key==='Enter')addQuickReply()">
+              <button class="btn btn-sm btn-primary" onclick="addQuickReply()">Add</button>
+            </div>
+            <div style="font-size: 11px; color: var(--text-dim); margin-top: 8px;">Type <strong>/</strong> in the composer to use quick replies</div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="tool-card">
+            <div class="tool-card-header">
+              <div class="tool-card-icon cyan">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <div class="tool-card-title">Quick Actions</div>
+            </div>
+            <button class="btn btn-secondary btn-sm tool-action-btn" onclick="summarizeChat()">Summarize Chat</button>
+            <button class="btn btn-secondary btn-sm tool-action-btn" onclick="exportMessages()">Export Messages</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Reminders -->
-    <div class="panel">
-      <div class="panel-header">⏰ תזכורות</div>
-      <div class="panel-body" id="reminders-list">
-        <div class="empty-state">טוען...</div>
-      </div>
-    </div>
+  </div>
 
-    <!-- Tags -->
-    <div class="panel tags-panel">
-      <div class="panel-header">🏷️ תגיות</div>
-      <div class="panel-body" id="tags-list">
-        <div class="empty-state">טוען...</div>
+  <!-- AGENT PANEL MODAL -->
+  <div class="modal-overlay" id="agent-modal" style="display:none;" onclick="if(event.target===this)closeAgentPanel()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Agent Management</h3>
+        <button class="modal-close" onclick="closeAgentPanel()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div id="agents-list"></div>
+        <div class="agent-divider">Add New Agent</div>
+        <div class="agent-add-form" id="agent-add-form">
+          <div class="form-field">
+            <label>Agent Name</label>
+            <input type="text" id="agent-name-input" placeholder="e.g. Sales Bot">
+          </div>
+          <div class="form-field">
+            <label>Phone Number</label>
+            <input type="text" id="agent-phone-input" placeholder="e.g. +972501234567">
+          </div>
+          <button class="btn btn-primary" onclick="addNewAgent()" style="width: 100%; margin-top: 4px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+            Connect WhatsApp
+          </button>
+          <div id="qr-container"></div>
+        </div>
+        <div class="agent-info-box">
+          <p>How it works</p>
+          <ul class="agent-info-list">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+              Each agent gets its own WhatsApp connection
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h.01M7 12h.01M7 17h.01M12 7h.01M12 12h.01M12 17h.01M17 7h.01M17 12h.01M17 17h.01"/></svg>
+              Scan QR code to link the number
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              Separate message store per agent
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Switch between agents from the dashboard
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
 
-  <script>
-    let allContacts = [];
-
-    const ICONS = {
-      note: '📝',
-      reminder: '⏰',
-      interaction: '💬',
-      tags: '🏷️',
-      global_note: '📌',
-    };
-
-    function formatDate(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
-      const now = new Date();
-      const diff = now - d;
-
-      if (diff < 60000) return 'הרגע';
-      if (diff < 3600000) return `לפני ${Math.floor(diff / 60000)} דק'`;
-      if (diff < 86400000) return `לפני ${Math.floor(diff / 3600000)} שעות`;
-      if (diff < 604800000) return `לפני ${Math.floor(diff / 86400000)} ימים`;
-
-      return d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
-
-    function formatPhone(jid) {
-      if (!jid) return '';
-      return jid.replace('@s.whatsapp.net', '').replace('@g.us', ' (קבוצה)');
-    }
-
-    async function loadStats() {
-      try {
-        const res = await fetch('/api/stats');
-        const stats = await res.json();
-        document.getElementById('stat-contacts').textContent = stats.total_contacts;
-        document.getElementById('stat-notes').textContent = stats.total_notes;
-        document.getElementById('stat-reminders').textContent = stats.pending_reminders;
-        document.getElementById('stat-due').textContent = stats.due_reminders;
-        document.getElementById('stat-tags').textContent = stats.tags?.length || 0;
-      } catch (e) {
-        console.error('Failed to load stats:', e);
-      }
-    }
-
-    async function loadActivity() {
-      try {
-        const res = await fetch('/api/activity');
-        const log = await res.json();
-        const el = document.getElementById('activity-feed');
-
-        if (log.length === 0) {
-          el.innerHTML = '<div class="empty-state">אין פעילות עדיין.<br>התחל להשתמש בטד ותראה כאן את ההיסטוריה!</div>';
-          return;
-        }
-
-        el.innerHTML = log.slice(0, 50).map(item => `
-          <div class="activity-item">
-            <div class="activity-icon ${item.type}">${ICONS[item.type] || '📌'}</div>
-            <div class="activity-content">
-              ${item.contact_name ? `<div class="name">${item.contact_name}</div>` : ''}
-              <div class="text">${item.text}</div>
-              <div class="time">${formatDate(item.timestamp)}</div>
-            </div>
-          </div>
-        `).join('');
-      } catch (e) {
-        console.error('Failed to load activity:', e);
-      }
-    }
-
-    async function loadContacts() {
-      try {
-        const res = await fetch('/api/crm');
-        const crm = await res.json();
-        allContacts = Object.values(crm.contacts || {});
-        renderContacts(allContacts);
-      } catch (e) {
-        console.error('Failed to load contacts:', e);
-      }
-    }
-
-    function renderContacts(contacts) {
-      const el = document.getElementById('contacts-list');
-
-      if (contacts.length === 0) {
-        el.innerHTML = '<div class="empty-state">אין אנשי קשר ב-CRM עדיין.<br>אמור לטד "תתייג את X כחבר" להתחיל!</div>';
-        return;
-      }
-
-      // Sort by updated_at desc
-      contacts.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''));
-
-      el.innerHTML = contacts.map(c => `
-        <div class="contact-item">
-          <div class="contact-name">${c.name || formatPhone(c.jid)}</div>
-          <div class="contact-phone">${formatPhone(c.jid)}</div>
-          ${c.tags?.length ? `
-            <div class="contact-tags">
-              ${c.tags.map(t => `<span class="tag">${t}</span>`).join('')}
-            </div>
-          ` : ''}
-          ${Object.keys(c.metadata || {}).length ? `
-            <div class="contact-meta">
-              ${Object.entries(c.metadata).map(([k, v]) => `${k}: ${v}`).join(' | ')}
-            </div>
-          ` : ''}
-          ${c.notes?.length ? `<div class="contact-notes-count">📝 ${c.notes.length} הערות</div>` : ''}
-          ${c.follow_up_date ? `<div class="contact-meta">📅 פולואפ: ${c.follow_up_date}</div>` : ''}
-          ${c.last_interaction ? `<div class="contact-meta">💬 אינטראקציה אחרונה: ${formatDate(c.last_interaction)}</div>` : ''}
-        </div>
-      `).join('');
-    }
-
-    function filterContacts(query) {
-      if (!query) {
-        renderContacts(allContacts);
-        return;
-      }
-      const q = query.toLowerCase();
-      const filtered = allContacts.filter(c =>
-        (c.name || '').toLowerCase().includes(q) ||
-        (c.jid || '').includes(q) ||
-        (c.tags || []).some(t => t.includes(q)) ||
-        Object.values(c.metadata || {}).some(v => v.toLowerCase().includes(q))
-      );
-      renderContacts(filtered);
-    }
-
-    async function loadReminders() {
-      try {
-        const res = await fetch('/api/crm');
-        const crm = await res.json();
-        const reminders = crm.reminders || [];
-        const el = document.getElementById('reminders-list');
-
-        if (reminders.length === 0) {
-          el.innerHTML = '<div class="empty-state">אין תזכורות.<br>אמור לטד "תזכיר לי מחר..." להוסיף!</div>';
-          return;
-        }
-
-        // Sort: pending first, then by due date
-        reminders.sort((a, b) => {
-          if (a.status === 'pending' && b.status !== 'pending') return -1;
-          if (a.status !== 'pending' && b.status === 'pending') return 1;
-          return (a.due_at || '').localeCompare(b.due_at || '');
-        });
-
-        el.innerHTML = reminders.map(r => `
-          <div class="reminder-item">
-            <div>
-              <div class="reminder-text">${r.text}</div>
-              <div class="reminder-due">📅 ${r.due_at ? new Date(r.due_at).toLocaleString('he-IL') : 'ללא תאריך'}</div>
-            </div>
-            <span class="reminder-status ${r.status}">${r.status === 'pending' ? 'ממתין' : r.status === 'done' ? 'בוצע' : 'בוטל'}</span>
-          </div>
-        `).join('');
-      } catch (e) {
-        console.error('Failed to load reminders:', e);
-      }
-    }
-
-    async function loadTags() {
-      try {
-        const res = await fetch('/api/stats');
-        const stats = await res.json();
-        const tags = stats.tags || [];
-        const el = document.getElementById('tags-list');
-
-        if (tags.length === 0) {
-          el.innerHTML = '<div class="empty-state">אין תגיות עדיין.<br>אמור לטד "תתייג את X כ-friend" להתחיל!</div>';
-          return;
-        }
-
-        el.innerHTML = tags.map(t => `
-          <div class="tag-row">
-            <span class="tag-name">🏷️ ${t.tag}</span>
-            <span class="tag-count">${t.count} אנשי קשר</span>
-          </div>
-        `).join('');
-      } catch (e) {
-        console.error('Failed to load tags:', e);
-      }
-    }
-
-    function loadAll() {
-      loadStats();
-      loadActivity();
-      loadContacts();
-      loadReminders();
-      loadTags();
-    }
-
-    // Auto-refresh every 30 seconds
-    loadAll();
-    setInterval(loadAll, 30000);
-  </script>
+  <script src="/app.js"></script>
 </body>
 </html>

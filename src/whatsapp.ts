@@ -6,6 +6,7 @@ import makeWASocket, {
   type GroupMetadata,
   type proto,
 } from '@whiskeysockets/baileys';
+// USyncQuery etc. available but WhatsApp doesn't expose saved contact names via web protocol
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import qrcode from 'qrcode-terminal';
@@ -56,6 +57,252 @@ let sock: WASocket | null = null;
 let groupCache: Record<string, GroupMetadata> = {};
 let connectionState: 'disconnected' | 'connecting' | 'connected' = 'disconnected';
 
+// Multi-agent support
+export interface AgentInfo {
+  id: string;
+  name: string;
+  phone: string;
+  status: 'pending_qr' | 'connecting' | 'connected' | 'disconnected';
+  qrCode?: string;
+  authDir: string;
+  createdAt: string;
+}
+
+const agentSockets: Map<string, WASocket> = new Map();
+const agentInfos: Map<string, AgentInfo> = new Map();
+const AGENTS_FILE = './store/agents.json';
+let activeAgentId: string = 'main'; // 'main' = original connection, or agent id
+
+// Restore agents from file (metadata only, not connections)
+if (fs.existsSync(AGENTS_FILE)) {
+  try {
+    const data = JSON.parse(fs.readFileSync(AGENTS_FILE, 'utf-8'));
+    for (const agent of data) {
+      agentInfos.set(agent.id, { ...agent, status: 'disconnected', qrCode: undefined });
+    }
+    log(`Agents restored: ${agentInfos.size} agents`);
+  } catch {}
+}
+
+function saveAgentsFile() {
+  try {
+    const agents = Array.from(agentInfos.values()).map(a => ({
+      id: a.id,
+      name: a.name,
+      phone: a.phone,
+      authDir: a.authDir,
+      createdAt: a.createdAt,
+    }));
+    const dir = path.dirname(AGENTS_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(AGENTS_FILE, JSON.stringify(agents, null, 2));
+  } catch (err) {
+    log('Failed to save agents file:', err);
+  }
+}
+
+export function getAgentInfos(): AgentInfo[] {
+  return Array.from(agentInfos.values());
+}
+
+export function getAgentInfo(id: string): AgentInfo | undefined {
+  return agentInfos.get(id);
+}
+
+export async function createAgentConnection(
+  agentId: string,
+  name: string,
+  phone: string,
+): Promise<AgentInfo> {
+  const authDir = `./auth_info_agent_${agentId}`;
+
+  const agent: AgentInfo = {
+    id: agentId,
+    name,
+    phone,
+    status: 'pending_qr',
+    authDir,
+    createdAt: new Date().toISOString(),
+  };
+
+  agentInfos.set(agentId, agent);
+  saveAgentsFile();
+
+  // Start connection in background
+  connectAgent(agent).catch(err => {
+    log(`Agent ${agentId} connection error:`, err);
+    agent.status = 'disconnected';
+  });
+
+  return agent;
+}
+
+async function connectAgent(agent: AgentInfo): Promise<void> {
+  const { state, saveCreds } = await useMultiFileAuthState(agent.authDir);
+  const { version } = await fetchLatestBaileysVersion();
+
+  const agentSock = makeWASocket({
+    version,
+    auth: state,
+    logger,
+    generateHighQualityLinkPreview: false,
+    syncFullHistory: false,
+    defaultQueryTimeoutMs: 60_000,
+  });
+
+  agentSock.ev.on('creds.update', saveCreds);
+
+  agentSock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr) {
+      agent.qrCode = qr;
+      agent.status = 'pending_qr';
+      log(`Agent ${agent.id} (${agent.name}): QR code generated`);
+    }
+
+    if (connection === 'close') {
+      agent.status = 'disconnected';
+      agent.qrCode = undefined;
+      const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+      log(`Agent ${agent.id} disconnected. Status: ${statusCode}, Reconnect: ${shouldReconnect}`);
+
+      if (shouldReconnect) {
+        agent.status = 'connecting';
+        setTimeout(() => connectAgent(agent), 5000);
+      }
+    } else if (connection === 'open') {
+      agent.status = 'connected';
+      agent.qrCode = undefined;
+      log(`Agent ${agent.id} (${agent.name}): Connected!`);
+    } else if (connection === 'connecting') {
+      agent.status = 'connecting';
+    }
+  });
+
+  agentSockets.set(agent.id, agentSock);
+}
+
+export async function removeAgent(agentId: string): Promise<boolean> {
+  const agent = agentInfos.get(agentId);
+  if (!agent) return false;
+
+  const agentSock = agentSockets.get(agentId);
+  if (agentSock) {
+    try { agentSock.end(undefined); } catch {}
+    agentSockets.delete(agentId);
+  }
+
+  agentInfos.delete(agentId);
+  saveAgentsFile();
+
+  try {
+    if (fs.existsSync(agent.authDir)) {
+      fs.rmSync(agent.authDir, { recursive: true });
+    }
+  } catch {}
+
+  return true;
+}
+
+// Contact name cache: jid -> { pushName, verifiedBizName, notify }
+const CONTACT_NAMES_FILE = './store/contact-names.json';
+let contactNames: Record<string, { name: string; source?: string; updatedAt: string }> = {};
+
+// Restore contact names from file
+if (fs.existsSync(CONTACT_NAMES_FILE)) {
+  try {
+    contactNames = JSON.parse(fs.readFileSync(CONTACT_NAMES_FILE, 'utf-8'));
+    log(`Contact names restored: ${Object.keys(contactNames).length} contacts`);
+  } catch {}
+}
+
+export function getContactNames(): Record<string, { name: string; source?: string; updatedAt: string }> {
+  return contactNames;
+}
+
+export function setContactName(jid: string, name: string) {
+  saveContactName(jid, name, 'phone');
+}
+
+// Re-bootstrap contact names from message store (for unnamed contacts)
+export async function syncContactNames(): Promise<number> {
+  let count = 0;
+  for (const [jid, messages] of Object.entries(messageStore)) {
+    if (!jid.endsWith('@s.whatsapp.net')) continue;
+    if (contactNames[jid]) continue;
+    let bestName: string | null = null;
+    let bestTs = 0;
+    for (const msg of messages) {
+      if (!msg.key.fromMe && msg.pushName) {
+        const ts = typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp :
+                   typeof msg.messageTimestamp === 'string' ? parseInt(msg.messageTimestamp) : 0;
+        if (ts > bestTs) { bestTs = ts; bestName = msg.pushName; }
+      }
+    }
+    if (bestName) {
+      saveContactName(jid, bestName, 'push');
+      count++;
+    }
+  }
+  if (count > 0) log(`Re-bootstrapped ${count} contact names from messages`);
+  return count;
+}
+
+function saveContactName(jid: string, name: string, source: 'phone' | 'push' | 'verified' | 'chat' = 'push') {
+  if (!name || !jid) return;
+  // Don't overwrite a phone-saved name with a pushName
+  const existing = contactNames[jid];
+  if (existing) {
+    // If we already have a phone-saved name, only overwrite with another phone-saved name
+    if (existing.source === 'phone' && source !== 'phone') return;
+  }
+  contactNames[jid] = { name, source, updatedAt: new Date().toISOString() };
+}
+
+// Flush contact names periodically
+setInterval(() => {
+  try {
+    const dir = path.dirname(CONTACT_NAMES_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(CONTACT_NAMES_FILE, JSON.stringify(contactNames, null, 2));
+  } catch {}
+}, STORE_FLUSH_INTERVAL);
+
+// Bootstrap contact names from message store on startup
+function bootstrapContactNamesFromStore() {
+  let count = 0;
+  for (const [jid, messages] of Object.entries(messageStore)) {
+    if (!jid.endsWith('@s.whatsapp.net')) continue;
+    // Already have a name? skip
+    if (contactNames[jid]) continue;
+    // Find the most recent pushName from inbound messages
+    let bestName: string | null = null;
+    let bestTs = 0;
+    for (const msg of messages) {
+      if (!msg.key.fromMe && msg.pushName) {
+        const ts = typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp :
+                   typeof msg.messageTimestamp === 'string' ? parseInt(msg.messageTimestamp) : 0;
+        if (ts > bestTs) {
+          bestTs = ts;
+          bestName = msg.pushName;
+        }
+      }
+    }
+    if (bestName) {
+      saveContactName(jid, bestName, 'push');
+      count++;
+    }
+  }
+  if (count > 0) {
+    log(`Bootstrapped ${count} contact names from message store`);
+  }
+}
+
+// Run bootstrap after store restore
+bootstrapContactNamesFromStore();
+
 export function getMessageStore(): Record<string, WAMessage[]> {
   return messageStore;
 }
@@ -101,6 +348,11 @@ function getTimestamp(msg: WAMessage): number {
 }
 
 export function getSocket(): WASocket | null {
+  if (activeAgentId === 'main') return sock;
+  return agentSockets.get(activeAgentId) || sock;
+}
+
+export function getMainSocket(): WASocket | null {
   return sock;
 }
 
@@ -109,7 +361,29 @@ export function getGroupCache(): Record<string, GroupMetadata> {
 }
 
 export function getConnectionState() {
-  return connectionState;
+  if (activeAgentId === 'main') return connectionState;
+  const agent = agentInfos.get(activeAgentId);
+  if (!agent) return connectionState;
+  if (agent.status === 'connected') return 'connected';
+  if (agent.status === 'connecting' || agent.status === 'pending_qr') return 'connecting';
+  return 'disconnected';
+}
+
+export function getActiveAgentId(): string {
+  return activeAgentId;
+}
+
+export function setActiveAgent(agentId: string): boolean {
+  if (agentId === 'main') {
+    activeAgentId = 'main';
+    log(`Switched to main agent`);
+    return true;
+  }
+  const agent = agentInfos.get(agentId);
+  if (!agent) return false;
+  activeAgentId = agentId;
+  log(`Switched to agent ${agentId} (${agent.name})`);
+  return true;
 }
 
 export async function connectWhatsApp(): Promise<WASocket> {
@@ -152,12 +426,49 @@ export async function connectWhatsApp(): Promise<WASocket> {
     }
   }
 
+  // Listen for contacts updates (synced from WhatsApp)
+  sock.ev.on('contacts.upsert', (contacts) => {
+    let phoneSaved = 0, pushSaved = 0;
+    for (const contact of contacts) {
+      const jid = contact.id;
+      // Priority: phone-saved name > verified business name > pushName (notify)
+      if (contact.name && jid) {
+        saveContactName(jid, contact.name, 'phone');
+        phoneSaved++;
+      } else if (contact.verifiedName && jid) {
+        saveContactName(jid, contact.verifiedName, 'verified');
+      } else if (contact.notify && jid) {
+        saveContactName(jid, contact.notify, 'push');
+        pushSaved++;
+      }
+    }
+    log(`Contacts synced: ${contacts.length} total, ${phoneSaved} phone-saved names, ${pushSaved} push names`);
+  });
+
+  sock.ev.on('contacts.update', (updates) => {
+    for (const update of updates) {
+      const jid = update.id;
+      // Same priority for updates
+      if ((update as any).name && jid) {
+        saveContactName(jid, (update as any).name, 'phone');
+      } else if (update.verifiedName && jid) {
+        saveContactName(jid, update.verifiedName, 'verified');
+      } else if (update.notify && jid) {
+        saveContactName(jid, update.notify, 'push');
+      }
+    }
+  });
+
   // Use ev.process to handle ALL events including buffered ones (history sync)
   sock.ev.process(async (events) => {
     if (events['messages.upsert']) {
       const { messages, type } = events['messages.upsert'];
       for (const msg of messages) {
         upsertMsg(msg);
+        // Extract contact name from incoming messages (low priority - push)
+        if (!msg.key.fromMe && msg.pushName && msg.key.remoteJid) {
+          saveContactName(msg.key.remoteJid, msg.pushName, 'push');
+        }
       }
 
     }
@@ -184,6 +495,11 @@ export async function connectWhatsApp(): Promise<WASocket> {
 
         jidCounts[jid] = (jidCounts[jid] || 0) + 1;
 
+        // Extract contact name from history messages (low priority - push)
+        if (!msg.key.fromMe && msg.pushName && jid.endsWith('@s.whatsapp.net')) {
+          saveContactName(jid, msg.pushName, 'push');
+        }
+
         if (!messageStore[jid]) {
           messageStore[jid] = [];
         }
@@ -196,6 +512,26 @@ export async function connectWhatsApp(): Promise<WASocket> {
         } else {
           messageStore[jid].push(msg);
           added++;
+        }
+      }
+
+      // Extract names from chat metadata
+      if (chats) {
+        for (const chat of chats) {
+          const chatJid = (chat as any).id;
+          // chat.name is usually the phone-saved name
+          const phoneName = (chat as any).name;
+          const pushNotify = (chat as any).notify;
+          const convTitle = (chat as any).conversationTitle;
+          if (chatJid && chatJid.endsWith('@s.whatsapp.net')) {
+            if (phoneName) {
+              saveContactName(chatJid, phoneName, 'phone');
+            } else if (convTitle) {
+              saveContactName(chatJid, convTitle, 'chat');
+            } else if (pushNotify) {
+              saveContactName(chatJid, pushNotify, 'push');
+            }
+          }
         }
       }
       log(`History sync (type=${syncType}, progress=${progress}, isLatest=${isLatest}): ${messages.length} msgs, ${added} new, ${chats?.length || 0} chats`);

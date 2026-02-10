@@ -235,6 +235,14 @@ export function getContactProfile(jid: string): ContactCRM | null {
   return crmData.contacts[jid] || null;
 }
 
+export function renameContact(jid: string, newName: string): ContactCRM {
+  const contact = ensureContact(jid, newName);
+  contact.name = newName;
+  contact.updated_at = new Date().toISOString();
+  saveCRM();
+  return contact;
+}
+
 export function updateFollowUp(jid: string, date: string, contactName?: string): ContactCRM {
   const contact = ensureContact(jid, contactName);
   contact.follow_up_date = date;

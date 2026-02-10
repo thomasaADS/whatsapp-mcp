@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { getMessageStore } from '../whatsapp.js';
+import { getMessageStore, getContactNames } from '../whatsapp.js';
 import { getMessageTimestamp } from '../store.js';
+import { getContactProfile } from '../crm.js';
 
 export const listContactsSchema = z.object({
   search: z.string().optional().describe('Optional search filter for phone number or contact name'),
@@ -14,6 +15,7 @@ export function listContacts(params: z.infer<typeof listContactsSchema>) {
     jid: string;
     phone: string;
     name: string | null;
+    crm_name: string | null;
     message_count_in_store: number;
     last_message_time: string | null;
   }> = [];
@@ -36,7 +38,14 @@ export function listContacts(params: z.infer<typeof listContactsSchema>) {
       }
     }
 
-    const displayName = pushName || phone;
+    // Also check the contact names cache (from WhatsApp contacts sync)
+    const contactNamesCache = getContactNames();
+    const cachedName = contactNamesCache[jid]?.name || null;
+
+    // Check CRM for a saved name
+    const crmProfile = getContactProfile(jid);
+    const crmName = crmProfile?.name || null;
+    const displayName = crmName || pushName || cachedName || phone;
 
     // Apply search filter
     if (search) {
@@ -48,7 +57,8 @@ export function listContacts(params: z.infer<typeof listContactsSchema>) {
     contacts.push({
       jid,
       phone,
-      name: pushName,
+      name: crmName || pushName || cachedName,
+      crm_name: crmName,
       message_count_in_store: messages.length,
       last_message_time: lastTs > 0 ? new Date(lastTs).toISOString() : null,
     });

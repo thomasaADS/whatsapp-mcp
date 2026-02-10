@@ -1,6 +1,7 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { connectWhatsApp } from './whatsapp.js';
 import { createMcpServer } from './mcp-server.js';
+import { startDashboardServer } from './dashboard-server.js';
 
 const log = (...args: unknown[]) => console.error('[main]', ...args);
 
@@ -15,6 +16,10 @@ async function main() {
     log('Failed to initiate WhatsApp connection:', err);
     // Continue anyway — tools will report disconnected state
   }
+
+  // Start CRM Command Center dashboard on port 3777
+  startDashboardServer(3777);
+  log('Dashboard server started on http://localhost:3777');
 
   // Create and start MCP server over stdio
   const server = createMcpServer();

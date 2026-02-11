@@ -43,6 +43,7 @@ export interface ContactCRM {
   metadata: Record<string, string>; // birthday, company, role, etc.
   last_interaction?: string;  // ISO date
   follow_up_date?: string;    // ISO date
+  auto_reply?: 'on' | 'off'; // per-contact auto-reply override (undefined = use global setting)
   created_at: string;
   updated_at: string;
 }
@@ -301,6 +302,32 @@ export function cancelReminder(reminderId: string): Reminder | null {
   reminder.status = 'cancelled';
   saveCRM();
   return reminder;
+}
+
+// ==================== AUTO-REPLY PER CONTACT ====================
+
+export function setAutoReplyForContact(jid: string, mode: 'on' | 'off' | 'default', contactName?: string): ContactCRM {
+  const contact = ensureContact(jid, contactName);
+  if (mode === 'default') {
+    delete contact.auto_reply;
+  } else {
+    contact.auto_reply = mode;
+  }
+  contact.updated_at = new Date().toISOString();
+  saveCRM();
+  return contact;
+}
+
+export function getAutoReplyForContact(jid: string): 'on' | 'off' | undefined {
+  const contact = crmData.contacts[jid];
+  return contact?.auto_reply;
+}
+
+// Get all contacts with auto-reply overrides
+export function getAutoReplyOverrides(): { jid: string; name?: string; auto_reply: 'on' | 'off' }[] {
+  return Object.values(crmData.contacts)
+    .filter(c => c.auto_reply !== undefined)
+    .map(c => ({ jid: c.jid, name: c.name, auto_reply: c.auto_reply! }));
 }
 
 // ==================== SEARCH / OVERVIEW ====================

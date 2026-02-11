@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ted - מרכז הפיקוד של וואטסאפ</title>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.82/build/spline-viewer.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #09090b;
+      --bg-card: #111114;
+      --bg-elevated: #18181b;
+      --bg-glass: rgba(17, 17, 20, 0.7);
+      --accent: #f59e0b;
+      --accent-glow: rgba(245, 158, 11, 0.25);
+      --accent-soft: rgba(245, 158, 11, 0.08);
+      --orange: #f97316;
+      --text: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #71717a;
+      --border: #27272a;
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --purple: #a855f7;
+      --red: #ef4444;
+      --cyan: #06b6d4;
+      --pink: #ec4899;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-lg: 24px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Heebo', 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ==================== ANIMATED TOP BAR ==================== */
+    .top-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 200;
+      background: linear-gradient(90deg, #f59e0b, #f97316, #ef4444, #ec4899, #a855f7, #3b82f6, #06b6d4, #22c55e, #f59e0b);
+      background-size: 200% 100%;
+      animation: gradientSlide 4s ease infinite;
+    }
+    @keyframes gradientSlide {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* ==================== BG EFFECTS ==================== */
+    .bg-grid {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background-image:
+        linear-gradient(rgba(245,158,11,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(245,158,11,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none; z-index: 0;
+    }
+
+    .bg-orb {
+      position: fixed; border-radius: 50%; pointer-events: none; z-index: 0;
+      filter: blur(120px);
+    }
+    .bg-orb-1 { top: -200px; right: -100px; width: 600px; height: 600px; background: linear-gradient(135deg, #f97316, #f59e0b); opacity: 0.12; }
+    .bg-orb-2 { top: 50%; left: -200px; width: 500px; height: 500px; background: linear-gradient(135deg, #3b82f6, #a855f7); opacity: 0.1; }
+    .bg-orb-3 { bottom: -100px; right: 20%; width: 400px; height: 400px; background: linear-gradient(135deg, #22c55e, #06b6d4); opacity: 0.08; }
+
+    /* ==================== NAVBAR ==================== */
+    .navbar {
+      position: fixed; top: 3px; left: 0; right: 0; z-index: 100;
+      padding: 16px 0;
+      background: rgba(9,9,11,0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(39,39,42,0.5);
+    }
+    .nav-inner {
+      max-width: 1200px; margin: 0 auto; padding: 0 32px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 12px; text-decoration: none;
+    }
+    .nav-logo-img {
+      width: 42px; height: 42px; border-radius: 12px; object-fit: cover;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+    .nav-logo-text { font-size: 22px; font-weight: 700; color: var(--text); }
+    .nav-links { display: flex; gap: 32px; align-items: center; }
+    .nav-link { color: var(--text-secondary); text-decoration: none; font-size: 14px; font-weight: 500; transition: color 0.2s; }
+    .nav-link:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--accent); color: #000; padding: 10px 24px; border-radius: 10px;
+      font-weight: 600; font-size: 14px; text-decoration: none; transition: all 0.2s; border: none; cursor: pointer;
+    }
+    .nav-cta:hover { background: #fbbf24; transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
+
+    /* ==================== HERO ==================== */
+    .hero {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 120px 32px 80px;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -55%);
+      width: 700px; height: 700px;
+      background: radial-gradient(circle, rgba(249,115,22,0.15) 0%, rgba(245,158,11,0.08) 30%, transparent 70%);
+      pointer-events: none;
+      animation: pulseGlow 4s ease-in-out infinite;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.6; transform: translate(-50%, -55%) scale(1); }
+      50% { opacity: 1; transform: translate(-50%, -55%) scale(1.1); }
+    }
+    .hero-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 60px; align-items: center;
+    }
+    .hero-text { position: relative; z-index: 2; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--accent-soft); border: 1px solid rgba(245,158,11,0.2);
+      color: var(--accent); padding: 8px 20px; border-radius: 100px;
+      font-size: 14px; font-weight: 500; margin-bottom: 28px;
+      animation: fadeInDown 0.8s ease;
+    }
+    .hero-badge-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse-dot 2s infinite; }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .hero-text h1 {
+      font-size: clamp(40px, 5vw, 64px); font-weight: 900;
+      line-height: 1.15; margin-bottom: 24px; letter-spacing: -1px;
+      animation: fadeInUp 0.8s ease 0.1s both;
+    }
+    .hero-text h1 .accent {
+      background: linear-gradient(135deg, var(--accent), var(--orange));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero-text h1 .accent-blue {
+      background: linear-gradient(135deg, var(--blue), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero-sub {
+      font-size: 19px; color: var(--text-secondary); line-height: 1.9;
+      margin-bottom: 36px; font-weight: 400;
+      animation: fadeInUp 0.8s ease 0.2s both;
+    }
+    .hero-buttons {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      animation: fadeInUp 0.8s ease 0.3s both;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #d97706);
+      color: #000; padding: 16px 40px; border-radius: 14px;
+      font-size: 17px; font-weight: 700; text-decoration: none;
+      transition: all 0.3s; border: none; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: inherit;
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 32px var(--accent-glow); }
+    .btn-secondary {
+      background: var(--bg-elevated); color: var(--text);
+      padding: 16px 40px; border-radius: 14px; font-size: 17px; font-weight: 600;
+      text-decoration: none; transition: all 0.3s; border: 1px solid var(--border);
+      cursor: pointer; display: inline-flex; align-items: center; gap: 10px;
+      font-family: inherit;
+    }
+    .btn-secondary:hover { background: var(--bg-card); border-color: var(--text-muted); transform: translateY(-2px); }
+
+    /* Ted character visual */
+    .hero-visual {
+      position: relative; z-index: 2;
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeInUp 1s ease 0.4s both;
+    }
+    .ted-character-wrap { position: relative; width: 420px; height: 420px; }
+    .ted-character-img {
+      width: 100%; height: 100%;
+      border-radius: 40px; object-fit: cover;
+      position: relative; z-index: 2;
+      box-shadow:
+        0 0 60px rgba(249,115,22,0.3),
+        0 0 120px rgba(245,158,11,0.15),
+        0 24px 48px rgba(0,0,0,0.5);
+      border: 3px solid rgba(245,158,11,0.3);
+      animation: float 6s ease-in-out infinite;
+    }
+
+    /* ==================== 3D SPLINE SCENE ==================== */
+    .spline-hero-bg {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 0; pointer-events: all;
+      opacity: 0.6;
+    }
+    .spline-hero-bg spline-viewer {
+      width: 100%; height: 100%;
+    }
+
+    /* 3D Showcase Section */
+    .scene3d-section {
+      position: relative; z-index: 1; padding: 80px 32px 100px;
+      text-align: center; overflow: hidden;
+    }
+    .scene3d-container {
+      max-width: 1000px; margin: 0 auto; position: relative;
+      border-radius: var(--radius-lg); overflow: hidden;
+      border: 1px solid rgba(245,158,11,0.15);
+      box-shadow: 0 0 80px rgba(249,115,22,0.08), 0 24px 64px rgba(0,0,0,0.4);
+      background: var(--bg-card);
+    }
+    .scene3d-container spline-viewer {
+      width: 100%; height: 500px; display: block;
+    }
+    .scene3d-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 32px;
+      background: linear-gradient(180deg, transparent 0%, rgba(9,9,11,0.95) 100%);
+      text-align: center;
+    }
+    .scene3d-overlay h3 {
+      font-size: 22px; font-weight: 800; margin-bottom: 8px;
+    }
+    .scene3d-overlay p {
+      font-size: 14px; color: var(--text-secondary);
+    }
+    .scene3d-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 16px; border-radius: 100px;
+      background: linear-gradient(135deg, rgba(168,85,247,0.15), rgba(6,182,212,0.15));
+      border: 1px solid rgba(168,85,247,0.2);
+      color: var(--purple); font-size: 12px; font-weight: 600;
+      margin-bottom: 24px;
+    }
+    .scene3d-hint {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-top: 16px; padding: 8px 20px; border-radius: 100px;
+      background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.15);
+      font-size: 12px; color: var(--accent); font-weight: 500;
+      animation: pulse-dot 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-16px); }
+    }
+    .float-bubble {
+      position: absolute; border-radius: 16px; padding: 10px 16px;
+      font-size: 13px; font-weight: 600; z-index: 3;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      white-space: nowrap;
+      animation: floatBubble 5s ease-in-out infinite;
+    }
+    @keyframes floatBubble {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      33% { transform: translateY(-8px) rotate(1deg); }
+      66% { transform: translateY(4px) rotate(-1deg); }
+    }
+    .bubble-1 { top: 20px; right: -30px; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: var(--green); animation-delay: 0s; }
+    .bubble-2 { bottom: 80px; right: -50px; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: var(--blue); animation-delay: 1.5s; }
+    .bubble-3 { top: 100px; left: -40px; background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.3); color: var(--purple); animation-delay: 3s; }
+    .bubble-4 { bottom: 30px; left: -20px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); color: var(--accent); animation-delay: 0.8s; }
+    .bubble-5 { top: -10px; left: 40%; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: var(--red); animation-delay: 2s; }
+
+    .ted-ring {
+      position: absolute; top: -20px; left: -20px; right: -20px; bottom: -20px;
+      border: 2px solid rgba(245,158,11,0.1); border-radius: 50px; z-index: 1;
+      animation: ringPulse 3s ease-in-out infinite;
+    }
+    .ted-ring-2 {
+      position: absolute; top: -40px; left: -40px; right: -40px; bottom: -40px;
+      border: 1px solid rgba(59,130,246,0.08); border-radius: 60px; z-index: 0;
+      animation: ringPulse 3s ease-in-out infinite 1s;
+    }
+    @keyframes ringPulse {
+      0%, 100% { opacity: 0.3; transform: scale(1); }
+      50% { opacity: 0.8; transform: scale(1.02); }
+    }
+
+    /* Stats bar */
+    .hero-stats {
+      display: flex; gap: 32px; margin-top: 48px;
+      animation: fadeInUp 0.8s ease 0.5s both;
+    }
+    .hero-stat { text-align: center; }
+    .hero-stat-num { font-size: 32px; font-weight: 800; letter-spacing: -1px; }
+    .hero-stat-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
+    .stat-amber { color: var(--accent); }
+    .stat-blue { color: var(--blue); }
+    .stat-purple { color: var(--purple); }
+    .stat-green { color: var(--green); }
+    .stat-cyan { color: var(--cyan); }
+
+    /* ==================== TECH STACK BAR ==================== */
+    .tech-bar {
+      position: relative; z-index: 1; padding: 32px;
+      text-align: center;
+      border-bottom: 1px solid rgba(39,39,42,0.3);
+    }
+    .tech-bar-label { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase; }
+    .tech-badges { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .tech-badge {
+      padding: 6px 16px; border-radius: 100px;
+      font-size: 13px; font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      transition: all 0.3s;
+    }
+    .tech-badge:hover { border-color: var(--accent); color: var(--text); }
+    .tech-badge span { margin-left: 6px; opacity: 0.6; }
+
+    /* ==================== SECTIONS ==================== */
+    section { position: relative; z-index: 1; padding: 100px 32px; }
+    .section-inner { max-width: 1200px; margin: 0 auto; }
+    .section-label {
+      display: inline-block; font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 2px; color: var(--accent); margin-bottom: 16px;
+    }
+    .section-title { font-size: clamp(32px,4vw,48px); font-weight: 800; line-height: 1.2; margin-bottom: 20px; }
+    .section-desc { font-size: 18px; color: var(--text-secondary); max-width: 600px; line-height: 1.8; }
+    .section-header { margin-bottom: 64px; }
+
+    .section-divider {
+      height: 2px; max-width: 200px; margin: 0 auto; position: relative; z-index: 1;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--blue), var(--purple), transparent);
+      opacity: 0.4;
+    }
+
+    /* ==================== "WHO IS TED" ==================== */
+    .who-section { background: linear-gradient(180deg, transparent 0%, rgba(17,17,20,0.5) 100%); }
+    .who-grid { display: grid; grid-template-columns: 300px 1fr; gap: 64px; align-items: center; }
+    .who-ted-card { text-align: center; position: relative; }
+    .who-ted-img {
+      width: 240px; height: 240px; border-radius: 32px; object-fit: cover;
+      box-shadow: 0 0 40px rgba(249,115,22,0.2), 0 16px 32px rgba(0,0,0,0.4);
+      border: 2px solid rgba(245,158,11,0.2);
+      margin-bottom: 20px;
+      animation: float 6s ease-in-out infinite;
+    }
+    .who-ted-name {
+      font-size: 28px; font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--orange));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .who-ted-role { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+    .who-text h2 { font-size: 36px; font-weight: 800; margin-bottom: 20px; line-height: 1.3; }
+    .who-text p { font-size: 17px; color: var(--text-secondary); line-height: 1.9; margin-bottom: 28px; }
+    .who-abilities { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .ability {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 14px 16px; transition: all 0.3s;
+    }
+    .ability:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .ability-icon {
+      width: 36px; height: 36px; min-width: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ability-text { font-size: 13px; font-weight: 600; }
+
+    /* ==================== FEATURES ==================== */
+    .features-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 24px; }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 32px; transition: all 0.3s; position: relative; overflow: hidden;
+    }
+    .feature-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--card-accent, var(--accent)), transparent);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .feature-card:hover { border-color: #3f3f46; transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
+    }
+    .feature-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+    .feature-card p { font-size: 14px; color: var(--text-secondary); line-height: 1.8; }
+    .feature-list { list-style: none; margin-top: 16px; }
+    .feature-list li {
+      font-size: 13px; color: var(--text-muted); padding: 6px 0;
+      border-bottom: 1px solid rgba(39,39,42,0.5);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .feature-list li:last-child { border: none; }
+    .check-icon {
+      width: 16px; height: 16px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .check-icon svg { width: 10px; height: 10px; fill: none; stroke-width: 3; }
+    .check-green { background: rgba(34,197,94,0.15); }
+    .check-green svg { stroke: var(--green); }
+    .check-blue { background: rgba(59,130,246,0.15); }
+    .check-blue svg { stroke: var(--blue); }
+    .check-amber { background: var(--accent-soft); }
+    .check-amber svg { stroke: var(--accent); }
+    .check-purple { background: rgba(168,85,247,0.15); }
+    .check-purple svg { stroke: var(--purple); }
+    .check-red { background: rgba(239,68,68,0.15); }
+    .check-red svg { stroke: var(--red); }
+    .check-cyan { background: rgba(6,182,212,0.15); }
+    .check-cyan svg { stroke: var(--cyan); }
+    .check-pink { background: rgba(236,72,153,0.15); }
+    .check-pink svg { stroke: var(--pink); }
+
+    /* NEW tag on feature cards */
+    .feature-new {
+      position: absolute; top: 16px; left: 16px;
+      background: linear-gradient(135deg, var(--green), #16a34a);
+      color: #fff; font-size: 10px; font-weight: 700;
+      padding: 3px 10px; border-radius: 100px;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+
+    /* ==================== CHAT DEMO ==================== */
+    .chat-section { text-align: center; }
+    .chat-demos { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 960px; margin: 0 auto; }
+    .chat-demo-wrap { text-align: center; }
+    .chat-demo-label {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; margin-bottom: 16px;
+      padding: 6px 16px; border-radius: 100px;
+    }
+    .chat-window {
+      background: #0b1014;
+      border: 1px solid var(--border); border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+    .chat-window-glow-amber { box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 80px rgba(249,115,22,0.08); }
+    .chat-window-glow-red { box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 80px rgba(239,68,68,0.08); }
+    .chat-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border);
+    }
+    .chat-header-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; }
+    .chat-header-avatar-amber { border: 2px solid var(--accent); }
+    .chat-header-avatar-red { border: 2px solid var(--red); }
+    .chat-header-info { text-align: right; }
+    .chat-header-name { font-size: 15px; font-weight: 700; }
+    .chat-header-status { font-size: 11px; }
+    .chat-body { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+    .chat-msg { max-width: 85%; padding: 10px 16px; border-radius: 16px; font-size: 14px; line-height: 1.6; position: relative; }
+    .chat-msg-in { align-self: flex-start; background: var(--bg-elevated); border-bottom-right-radius: 4px; }
+    .chat-msg-out { align-self: flex-end; border-bottom-left-radius: 4px; }
+    .chat-msg-out-amber { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.2); }
+    .chat-msg-out-red { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.2); }
+    .chat-msg-time { font-size: 10px; color: var(--text-muted); margin-top: 4px; text-align: left; direction: ltr; }
+    .chat-msg-sender { font-size: 11px; font-weight: 600; margin-bottom: 2px; }
+    .chat-msg-sender-amber { color: var(--accent); }
+    .chat-msg-sender-red { color: var(--red); }
+
+    /* ==================== PROCESS ==================== */
+    .process-section { background: linear-gradient(180deg, rgba(17,17,20,0.5) 0%, transparent 100%); }
+    .process-steps { display: flex; flex-direction: column; position: relative; max-width: 800px; margin: 0 auto; }
+    .process-line {
+      position: absolute; right: 31px; top: 40px; bottom: 40px; width: 2px;
+      background: linear-gradient(180deg, var(--accent), var(--blue), var(--purple), var(--green)); opacity: 0.3;
+    }
+    .process-step { display: flex; gap: 32px; align-items: flex-start; padding: 32px 0; position: relative; }
+    .process-num {
+      width: 64px; height: 64px; min-width: 64px; border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; font-weight: 800; position: relative; z-index: 2;
+    }
+    .process-step-content h3 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .process-step-content p { font-size: 15px; color: var(--text-secondary); line-height: 1.8; }
+    .process-tag {
+      display: inline-block; margin-top: 12px; padding: 4px 12px;
+      border-radius: 100px; font-size: 12px; font-weight: 600;
+    }
+
+    /* ==================== USE CASES ==================== */
+    .usecases-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 24px; }
+    .usecase-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 32px; display: flex; gap: 20px; align-items: flex-start; transition: all 0.3s;
+    }
+    .usecase-card:hover { border-color: #3f3f46; transform: translateY(-2px); }
+    .usecase-icon {
+      width: 56px; height: 56px; min-width: 56px; border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .usecase-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+    .usecase-card p { font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+
+    /* ==================== CTA ==================== */
+    .cta-section { text-align: center; padding: 120px 32px; }
+    .cta-box {
+      max-width: 700px; margin: 0 auto; position: relative;
+      background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(59,130,246,0.04));
+      border: 1px solid rgba(245,158,11,0.2); border-radius: var(--radius-lg); padding: 64px 48px;
+    }
+    .cta-ted {
+      width: 80px; height: 80px; border-radius: 24px; object-fit: cover;
+      border: 3px solid var(--accent); margin-bottom: 24px;
+      box-shadow: 0 0 30px var(--accent-glow);
+      animation: float 5s ease-in-out infinite;
+    }
+    .cta-box h2 { font-size: 36px; font-weight: 800; margin-bottom: 16px; }
+    .cta-box p { font-size: 18px; color: var(--text-secondary); margin-bottom: 40px; line-height: 1.8; }
+    .cta-buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+    /* ==================== FOOTER ==================== */
+    .footer {
+      position: relative; z-index: 1;
+      border-top: 1px solid var(--border); padding: 48px 32px;
+    }
+    .footer-inner {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .footer-text { font-size: 13px; color: var(--text-muted); }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-link { color: var(--text-muted); text-decoration: none; font-size: 13px; transition: color 0.2s; }
+    .footer-link:hover { color: var(--text); }
+
+    /* ==================== ANIMATIONS ==================== */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeInDown { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { opacity: 0; transform: translateY(30px); transition: all 0.7s ease; }
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+    /* ==================== RESPONSIVE ==================== */
+    @media (max-width: 900px) {
+      .nav-links { display: none; }
+      .hero-inner { grid-template-columns: 1fr; text-align: center; }
+      .hero-text { order: 2; }
+      .hero-visual { order: 1; }
+      .ted-character-wrap { width: 280px; height: 280px; margin: 0 auto; }
+      .float-bubble { display: none; }
+      .hero-buttons { justify-content: center; }
+      .hero-stats { justify-content: center; flex-wrap: wrap; }
+      .who-grid { grid-template-columns: 1fr; text-align: center; }
+      .who-abilities { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: 1fr; }
+      .usecases-grid { grid-template-columns: 1fr; }
+      .chat-demos { grid-template-columns: 1fr; }
+      .process-line { display: none; }
+      .cta-box { padding: 40px 24px; }
+      .footer-inner { flex-direction: column; gap: 16px; }
+      .spline-hero-bg { display: none; }
+      .scene3d-container spline-viewer { height: 350px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Animated gradient top bar -->
+  <div class="top-bar"></div>
+
+  <!-- Background effects -->
+  <div class="bg-grid"></div>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <img src="ted-logo.png" class="nav-logo-img" alt="Ted">
+        <span class="nav-logo-text">Ted</span>
+      </a>
+      <div class="nav-links">
+        <a href="#who" class="nav-link">מי זה Ted?</a>
+        <a href="#3d" class="nav-link">3D ✨</a>
+        <a href="#features" class="nav-link">יכולות</a>
+        <a href="#demo" class="nav-link">דמו</a>
+        <a href="#process" class="nav-link">איך זה עובד</a>
+        <a href="/index.html" class="nav-cta">כניסה לדשבורד</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ==================== HERO ==================== -->
+  <section class="hero">
+    <!-- Interactive 3D background -->
+    <div class="spline-hero-bg">
+      <spline-viewer url="https://prod.spline.design/PBQQBw8bfXDhBo7w/scene.splinecode" background="transparent" loading="lazy"></spline-viewer>
+    </div>
+    <div class="hero-inner">
+      <div class="hero-text">
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          מחובר ופעיל 24/7
+        </div>
+        <h1>הכירו את <span class="accent">Ted</span><br>העוזר <span class="accent-blue">החכם</span> שלכם<br>בוואטסאפ</h1>
+        <p class="hero-sub">
+          Ted יושב על הוואטסאפ שלך, קורא הודעות, עונה אוטומטית, מנהל לקוחות, שומר תזכורות ועובד 24/7. מוגן באבטחת מידע מתקדמת ותמיכה בכל מספר בעולם.
+        </p>
+        <div class="hero-buttons">
+          <a href="/index.html" class="btn-primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            התחל עכשיו
+          </a>
+          <a href="#features" class="btn-secondary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            גלה עוד
+          </a>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat"><div class="hero-stat-num stat-amber">30+</div><div class="hero-stat-label">כלי MCP + CRM</div></div>
+          <div class="hero-stat"><div class="hero-stat-num stat-cyan">551+</div><div class="hero-stat-label">מיפוי מספרים</div></div>
+          <div class="hero-stat"><div class="hero-stat-num stat-purple">AI</div><div class="hero-stat-label">Claude Sonnet 4</div></div>
+          <div class="hero-stat"><div class="hero-stat-num stat-green">24/7</div><div class="hero-stat-label">מענה + אבטחה</div></div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="ted-character-wrap">
+          <div class="ted-ring"></div>
+          <div class="ted-ring-2"></div>
+          <img src="ted-logo.png" class="ted-character-img" alt="Ted - AI Assistant">
+
+          <div class="float-bubble bubble-1">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-left:6px;"><polyline points="20 6 9 17 4 12"/></svg>
+            הודעה נשלחה
+          </div>
+          <div class="float-bubble bubble-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-left:6px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            תזכורת נשמרה
+          </div>
+          <div class="float-bubble bubble-3">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-left:6px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            ליד חדש
+          </div>
+          <div class="float-bubble bubble-4">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-left:6px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Ted עונה...
+          </div>
+          <div class="float-bubble bubble-5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-left:6px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            מוגן!
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tech stack bar -->
+  <div class="tech-bar fade-in">
+    <div class="tech-bar-label">Powered by</div>
+    <div class="tech-badges">
+      <div class="tech-badge">Claude AI <span>Sonnet 4</span></div>
+      <div class="tech-badge">Baileys <span>WhatsApp</span></div>
+      <div class="tech-badge">MCP SDK <span>Protocol</span></div>
+      <div class="tech-badge">TypeScript <span>ESM</span></div>
+      <div class="tech-badge">Node.js <span>Server</span></div>
+    </div>
+  </div>
+
+  <!-- ==================== WHO IS TED ==================== -->
+  <section class="who-section" id="who">
+    <div class="section-inner">
+      <div class="who-grid fade-in">
+        <div class="who-ted-card">
+          <img src="ted-logo.png" class="who-ted-img" alt="Ted">
+          <div class="who-ted-name">Ted</div>
+          <div class="who-ted-role">AI WhatsApp Assistant</div>
+        </div>
+        <div class="who-text">
+          <span class="section-label">הכירו את Ted</span>
+          <h2>לא סתם בוט.<br>עוזר אישי אמיתי.</h2>
+          <p>
+            Ted הוא מערכת AI שלמה שמתחברת ישירות לוואטסאפ שלך. הוא מבין הקשר, זוכר פרטים, שומר תזכורות באמת (Tool Use), מתייג לקוחות, מגן על המידע שלך, ועונה בצורה טבעית כאילו אתה כותב.
+          </p>
+          <div class="who-abilities">
+            <div class="ability">
+              <div class="ability-icon" style="background:var(--accent-soft);color:var(--accent);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <div class="ability-text">מענה אוטומטי חכם</div>
+            </div>
+            <div class="ability">
+              <div class="ability-icon" style="background:rgba(59,130,246,0.1);color:var(--blue);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="ability-text">תזכורות אמיתיות (Tool Use)</div>
+            </div>
+            <div class="ability">
+              <div class="ability-icon" style="background:rgba(34,197,94,0.1);color:var(--green);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+              </div>
+              <div class="ability-text">תיוג ו-CRM מלא</div>
+            </div>
+            <div class="ability">
+              <div class="ability-icon" style="background:rgba(239,68,68,0.1);color:var(--red);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div class="ability-text">אבטחת מידע מתקדמת</div>
+            </div>
+            <div class="ability">
+              <div class="ability-icon" style="background:rgba(6,182,212,0.1);color:var(--cyan);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              </div>
+              <div class="ability-text">תמיכה בינלאומית (LID)</div>
+            </div>
+            <div class="ability">
+              <div class="ability-icon" style="background:rgba(236,72,153,0.1);color:var(--pink);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
+              <div class="ability-text">יצירת תמונות AI</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ==================== 3D INTERACTIVE SHOWCASE ==================== -->
+  <section class="scene3d-section" id="3d">
+    <div class="section-inner">
+      <div class="section-header fade-in" style="text-align:center;">
+        <div class="scene3d-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          חוויה תלת-מימדית
+        </div>
+        <h2 class="section-title">טכנולוגיה שאפשר לגעת בה</h2>
+        <p class="section-desc" style="margin:0 auto;">הזיזו את העכבר מעל הסצנה. Ted בנוי על טכנולוגיה אינטראקטיבית מהדור הבא.</p>
+      </div>
+      <div class="scene3d-container fade-in">
+        <spline-viewer url="https://prod.spline.design/UWoeqiir20o49Dah/scene.splinecode" background="rgba(9,9,11,1)" loading="lazy"></spline-viewer>
+        <div class="scene3d-overlay">
+          <h3>🌐 חוויית AI אינטראקטיבית</h3>
+          <p>סצנה תלת-מימדית אינטראקטיבית. הזיזו את העכבר לחוויה מלאה.</p>
+          <div class="scene3d-hint">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+            הזיזו את העכבר
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ==================== CHAT DEMO ==================== -->
+  <section class="chat-section" id="demo">
+    <div class="section-inner">
+      <div class="section-header fade-in" style="text-align:center;">
+        <span class="section-label">דמו חי</span>
+        <h2 class="section-title">ככה Ted נראה בפעולה</h2>
+        <p class="section-desc" style="margin:0 auto;">שתי דוגמאות: תזמון תור ואבטחת מידע</p>
+      </div>
+      <div class="chat-demos">
+        <!-- Demo 1: Scheduling -->
+        <div class="chat-demo-wrap fade-in">
+          <div class="chat-demo-label" style="background:var(--accent-soft);color:var(--accent);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            תזמון תורים
+          </div>
+          <div class="chat-window chat-window-glow-amber">
+            <div class="chat-header">
+              <img src="ted-logo.png" class="chat-header-avatar chat-header-avatar-amber" alt="Ted">
+              <div class="chat-header-info">
+                <div class="chat-header-name">Ted - תזמון</div>
+                <div class="chat-header-status" style="color:var(--green);">מחובר</div>
+              </div>
+            </div>
+            <div class="chat-body">
+              <div class="chat-msg chat-msg-in">
+                <div>היי, אפשר לקבוע תספורת מחר ב-11?</div>
+                <div class="chat-msg-time">09:41</div>
+              </div>
+              <div class="chat-msg chat-msg-out chat-msg-out-amber">
+                <div class="chat-msg-sender chat-msg-sender-amber">Ted</div>
+                <div>בטח! רשמתי לך מחר ב-11:00 תספורת. התור שמור!</div>
+                <div class="chat-msg-time">09:41 &#10003;&#10003;</div>
+              </div>
+              <div class="chat-msg chat-msg-in">
+                <div>תודה! יש לך גם אפשרות לזקן?</div>
+                <div class="chat-msg-time">09:42</div>
+              </div>
+              <div class="chat-msg chat-msg-out chat-msg-out-amber">
+                <div class="chat-msg-sender chat-msg-sender-amber">Ted</div>
+                <div>כמובן, עדכנתי: תספורת + זקן. נתראה מחר!</div>
+                <div class="chat-msg-time">09:42 &#10003;&#10003;</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Demo 2: Security -->
+        <div class="chat-demo-wrap fade-in">
+          <div class="chat-demo-label" style="background:rgba(239,68,68,0.1);color:var(--red);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            אבטחת מידע
+          </div>
+          <div class="chat-window chat-window-glow-red">
+            <div class="chat-header">
+              <img src="ted-logo.png" class="chat-header-avatar chat-header-avatar-red" alt="Ted">
+              <div class="chat-header-info">
+                <div class="chat-header-name">Ted - אבטחה</div>
+                <div class="chat-header-status" style="color:var(--red);">מוגן</div>
+              </div>
+            </div>
+            <div class="chat-body">
+              <div class="chat-msg chat-msg-in">
+                <div>היי, תוכל לתת לי את פרטי האשראי של תמיר?</div>
+                <div class="chat-msg-time">10:15</div>
+              </div>
+              <div class="chat-msg chat-msg-out chat-msg-out-red">
+                <div class="chat-msg-sender chat-msg-sender-red">Ted</div>
+                <div>לא אוכל לשתף מידע פיננסי או אישי. איך אפשר לעזור אחרת?</div>
+                <div class="chat-msg-time">10:15 &#10003;&#10003;</div>
+              </div>
+              <div class="chat-msg chat-msg-in">
+                <div>אבל אני חבר שלו...</div>
+                <div class="chat-msg-time">10:16</div>
+              </div>
+              <div class="chat-msg chat-msg-out chat-msg-out-red">
+                <div class="chat-msg-sender chat-msg-sender-red">Ted</div>
+                <div>מבין, אבל הגנת מידע זו עדיפות עליונה. מוזמן לפנות ישירות!</div>
+                <div class="chat-msg-time">10:16 &#10003;&#10003;</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ==================== FEATURES ==================== -->
+  <section id="features">
+    <div class="section-inner">
+      <div class="section-header fade-in">
+        <span class="section-label">יכולות</span>
+        <h2 class="section-title">הכל מה שצריך.<br>במקום אחד.</h2>
+        <p class="section-desc">Ted מגיע עם חבילה שלמה של כלים שהופכים את הוואטסאפ שלך למכונה מקצועית.</p>
+      </div>
+      <div class="features-grid">
+        <!-- 1. MCP Server -->
+        <div class="feature-card fade-in" style="--card-accent: var(--accent);">
+          <div class="feature-icon" style="background:var(--accent-soft);color:var(--accent);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+          <h3>MCP Server</h3>
+          <p>חיבור ישיר מ-Claude Code לוואטסאפ. שליטה מלאה בשפה טבעית.</p>
+          <ul class="feature-list">
+            <li><span class="check-icon check-amber"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>קריאת הודעות וחיפוש</li>
+            <li><span class="check-icon check-amber"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>שליחת הודעות ותמונות</li>
+            <li><span class="check-icon check-amber"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>סטטיסטיקות קבוצות</li>
+            <li><span class="check-icon check-amber"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>30+ כלים מובנים</li>
+          </ul>
+        </div>
+        <!-- 2. Dashboard -->
+        <div class="feature-card fade-in" style="--card-accent: var(--blue);">
+          <div class="feature-icon" style="background:rgba(59,130,246,0.1);color:var(--blue);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></div>
+          <h3>דשבורד פרימיום</h3>
+          <p>ממשק ווב כהה ומרהיב עם שלושה פאנלים לניהול מלא.</p>
+          <ul class="feature-list">
+            <li><span class="check-icon check-blue"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>קבוצות ואנשי קשר</li>
+            <li><span class="check-icon check-blue"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>פיד הודעות בזמן אמת</li>
+            <li><span class="check-icon check-blue"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>מצב Ted AI / ידני</li>
+            <li><span class="check-icon check-blue"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>תגובות מהירות עם /</li>
+          </ul>
+        </div>
+        <!-- 3. CRM -->
+        <div class="feature-card fade-in" style="--card-accent: var(--green);">
+          <div class="feature-icon" style="background:rgba(34,197,94,0.1);color:var(--green);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <h3>CRM מובנה</h3>
+          <p>ניהול קשרי לקוחות ישירות מהדשבורד עם שליטה מלאה על מענה אוטומטי.</p>
+          <ul class="feature-list">
+            <li><span class="check-icon check-green"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>תגיות, הערות ומטא-דאטה</li>
+            <li><span class="check-icon check-green"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>תזכורות עם מעקב</li>
+            <li><span class="check-icon check-green"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>מעקב Follow-up</li>
+            <li><span class="check-icon check-green"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>מענה מותאם פר-קונטקט</li>
+          </ul>
+        </div>
+        <!-- 4. Ted AI -->
+        <div class="feature-card fade-in" style="--card-accent: var(--purple);">
+          <div class="feature-icon" style="background:rgba(168,85,247,0.1);color:var(--purple);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M16 14H8a4 4 0 0 0-4 4v2h16v-2a4 4 0 0 0-4-4z"/></svg></div>
+          <h3>Ted AI Assistant</h3>
+          <p>עוזר AI עם Claude Tool Use. שומר תזכורות באמת, לא רק אומר שהוא שמר.</p>
+          <ul class="feature-list">
+            <li><span class="check-icon check-purple"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>מענה אוטומטי חכם</li>
+            <li><span class="check-icon check-purple"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Tool Use - פעולות CRM אמיתיות</li>
+            <li><span class="check-icon check-purple"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>יצירת תמונות AI</li>
+            <li><span class="check-icon check-purple"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>מעבר "אתה" / "Ted"</li>
+          </ul>
+        </div>
+        <!-- 5. Multi-agent -->
+        <div class="feature-card fade-in" style="--card-accent: var(--cyan);">
+          <div class="feature-icon" style="background:rgba(6,182,212,0.1);color:var(--cyan);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="12.01"/></svg></div>
+          <h3>ריבוי סוכנים</h3>
+          <p>חיבור מספר חשבונות וואטסאפ במקביל עם QR מהדשבורד.</p>
+          <ul class="feature-list">
+            <li><span class="check-icon check-cyan"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>חיבור QR Code</li>
+            <li><span class="check-icon check-cyan"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>מעבר בין סוכנים</li>
+            <li><span class="check-icon check-cyan"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>ניטור סטטוס</li>
+            <li><span class="check-icon check-cyan"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>הפרדת Auth</li>
+          </ul>
+        </div>
+        <!-- 6. Quick Replies -->
+        <div class="feature-card fade-in" style="--card-accent: var(--pink);">
+          <div class="feature-icon" style="background:rgba(236,72,153,0.1);color:var(--pink);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+          <h3>תגובות מהירות</h3>
+          <p>שמירת תבניות הודעות. הקלד / בקומפוזר ובחר בלחיצה.</p>
+          <ul class="feature-list">
+            <li><span class="check-icon check-pink"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>הפעלה עם /</li>
+            <li><span class="check-icon check-pink"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>חיפוש וסינון</li>
+            <li><span class="check-icon check-pink"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>ניווט מקלדת</li>
+            <li><span class="check-icon check-pink"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>ניהול מהדשבורד</li>
+          </ul>
+        </div>
+        <!-- 7. SECURITY - NEW -->
+        <div class="feature-card fade-in" style="--card-accent: var(--red);">
+          <span class="feature-new">NEW</span>
+          <div class="feature-icon" style="background:rgba(239,68,68,0.1);color:var(--red);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <h3>אבטחת מידע</h3>
+          <p>Ted לעולם לא ישתף מידע אישי, פרטי אשראי או סיסמאות. הגנה מפני הנדסה חברתית.</p>
+          <ul class="feature-list">
+            <li><span class="check-icon check-red"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>חסימת מידע פיננסי</li>
+            <li><span class="check-icon check-red"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>הגנה מהנדסה חברתית</li>
+            <li><span class="check-icon check-red"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>סירוב אוטומטי לבקשות רגישות</li>
+            <li><span class="check-icon check-red"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>תאימות פרטיות</li>
+          </ul>
+        </div>
+        <!-- 8. INTERNATIONAL/LID - NEW -->
+        <div class="feature-card fade-in" style="--card-accent: var(--cyan);">
+          <span class="feature-new">NEW</span>
+          <div class="feature-icon" style="background:rgba(6,182,212,0.1);color:var(--cyan);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+          <h3>תמיכה בינלאומית</h3>
+          <p>מיפוי אוטומטי של כל סוגי המספרים כולל LID. הודעות מכל העולם מאוחדות.</p>
+          <ul class="feature-list">
+            <li><span class="check-icon check-cyan"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>מיפוי LID אוטומטי</li>
+            <li><span class="check-icon check-cyan"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>תמיכה במספרים מחו"ל</li>
+            <li><span class="check-icon check-cyan"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>איחוד שיחות אוטומטי</li>
+            <li><span class="check-icon check-cyan"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>551+ מיפויים פעילים</li>
+          </ul>
+        </div>
+        <!-- 9. PER-CONTACT AUTO-REPLY - NEW -->
+        <div class="feature-card fade-in" style="--card-accent: var(--green);">
+          <span class="feature-new">NEW</span>
+          <div class="feature-icon" style="background:rgba(34,197,94,0.1);color:var(--green);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="5" width="22" height="14" rx="7" ry="7"/><circle cx="16" cy="12" r="3"/></svg></div>
+          <h3>מענה מותאם אישית</h3>
+          <p>שלוט בדיוק למי Ted עונה ולמי לא. הגדרה פר-קונטקט מהדשבורד.</p>
+          <ul class="feature-list">
+            <li><span class="check-icon check-green"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>On / Off / Default פר קונטקט</li>
+            <li><span class="check-icon check-green"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>שליטה מלאה מהדשבורד</li>
+            <li><span class="check-icon check-green"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>עדיפות קונטקט על גלובלי</li>
+            <li><span class="check-icon check-green"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>תמיכה בצ'אטים פרטיים</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ==================== PROCESS ==================== -->
+  <section class="process-section" id="process">
+    <div class="section-inner">
+      <div class="section-header fade-in" style="text-align:center;">
+        <span class="section-label">איך זה עובד</span>
+        <h2 class="section-title">מהתקנה ועד שליטה מלאה</h2>
+        <p class="section-desc" style="margin:0 auto;">ארבעה צעדים פשוטים ואתה בפנים</p>
+      </div>
+      <div class="process-steps">
+        <div class="process-line"></div>
+        <div class="process-step fade-in">
+          <div class="process-num" style="background:var(--accent-soft);color:var(--accent);">1</div>
+          <div class="process-step-content">
+            <h3>התקנה מהירה</h3>
+            <p>שלוש פקודות בטרמינל וזה רץ. npm install, npm run build, npm run dev. זהו.</p>
+            <span class="process-tag" style="background:var(--accent-soft);color:var(--accent);">2 דקות</span>
+          </div>
+        </div>
+        <div class="process-step fade-in">
+          <div class="process-num" style="background:rgba(59,130,246,0.1);color:var(--blue);">2</div>
+          <div class="process-step-content">
+            <h3>סריקת QR Code</h3>
+            <p>QR מופיע במסך. סורקים עם הטלפון דרך הגדרות > מכשירים מקושרים. חיבור חד-פעמי.</p>
+            <span class="process-tag" style="background:rgba(59,130,246,0.1);color:var(--blue);">30 שניות</span>
+          </div>
+        </div>
+        <div class="process-step fade-in">
+          <div class="process-num" style="background:rgba(168,85,247,0.1);color:var(--purple);">3</div>
+          <div class="process-step-content">
+            <h3>חיבור MCP ל-Claude</h3>
+            <p>מוסיפים את ההגדרה ל-Claude Code ופתאום Claude יודע לגשת ישירות לוואטסאפ שלכם.</p>
+            <span class="process-tag" style="background:rgba(168,85,247,0.1);color:var(--purple);">קופי-פייסט</span>
+          </div>
+        </div>
+        <div class="process-step fade-in">
+          <div class="process-num" style="background:rgba(34,197,94,0.1);color:var(--green);">4</div>
+          <div class="process-step-content">
+            <h3>שליטה מלאה</h3>
+            <p>פותחים את הדשבורד. שולחים הודעות, מנהלים CRM, מפעילים את Ted. הכל עובד עם אבטחה מלאה.</p>
+            <span class="process-tag" style="background:rgba(34,197,94,0.1);color:var(--green);">מוכן!</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-divider"></div>
+
+  <!-- ==================== USE CASES ==================== -->
+  <section id="usecases">
+    <div class="section-inner">
+      <div class="section-header fade-in">
+        <span class="section-label">שימושים</span>
+        <h2 class="section-title">למי Ted מתאים?</h2>
+      </div>
+      <div class="usecases-grid">
+        <div class="usecase-card fade-in">
+          <div class="usecase-icon" style="background:var(--accent-soft);color:var(--accent);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+          <div><h3>בעלי עסקים</h3><p>ניהול לקוחות, מעקב אחרי פניות, מענה אוטומטי ללידים חדשים. Ted עונה גם כשאתה ישן.</p></div>
+        </div>
+        <div class="usecase-card fade-in">
+          <div class="usecase-icon" style="background:rgba(59,130,246,0.1);color:var(--blue);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <div><h3>מנהלי קהילות</h3><p>ניטור קבוצות, סיכום יומי, סטטיסטיקות פעילות. דעו מה קורה בלי 500 הודעות.</p></div>
+        </div>
+        <div class="usecase-card fade-in">
+          <div class="usecase-icon" style="background:rgba(168,85,247,0.1);color:var(--purple);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+          <div><h3>אנשי מכירות</h3><p>תיוג לידים, Follow-up אוטומטי, תזכורות, וניהול Pipeline ישירות מהוואטסאפ.</p></div>
+        </div>
+        <div class="usecase-card fade-in">
+          <div class="usecase-icon" style="background:rgba(6,182,212,0.1);color:var(--cyan);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></div>
+          <div><h3>מפתחים</h3><p>API מלא, MCP Server, שילוב עם Claude Code. בנו אוטומציות בשפה טבעית מהטרמינל.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== CTA ==================== -->
+  <section class="cta-section" style="position:relative;overflow:hidden;">
+    <!-- 3D ambient background for CTA -->
+    <div style="position:absolute;top:0;left:0;right:0;bottom:0;opacity:0.3;pointer-events:none;z-index:0;">
+      <spline-viewer url="https://prod.spline.design/LEvjG3OETYd2GsRw/scene.splinecode" background="transparent" loading="lazy"></spline-viewer>
+    </div>
+    <div class="cta-box fade-in" style="position:relative;z-index:1;">
+      <img src="ted-logo.png" class="cta-ted" alt="Ted">
+      <h2>מוכנים להתחיל?</h2>
+      <p>Ted מחכה לכם. התקנה בשתי דקות, חיבור QR בשלושים שניות, ואתם בפנים. עם אבטחה מלאה ותמיכה בכל מספר בעולם.</p>
+      <div class="cta-buttons">
+        <a href="/index.html" class="btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          פתח את הדשבורד
+        </a>
+        <a href="https://github.com" class="btn-secondary" target="_blank">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-text">Ted Command Center &copy; 2026. Built with Baileys, MCP SDK & Claude AI.</div>
+      <div class="footer-links">
+        <a href="/index.html" class="footer-link">דשבורד</a>
+        <a href="#features" class="footer-link">יכולות</a>
+        <a href="#process" class="footer-link">איך זה עובד</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) entry.target.classList.add('visible');
+      });
+    }, { threshold: 0.1 });
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  </script>
+
+</body>
+</html>

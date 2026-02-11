@@ -179,7 +179,7 @@ function renderSidebar() {
           ${avatarHtml(g.name)}
           <div class="sidebar-item-info">
             <div class="sidebar-item-name">${escHtml(g.name)}</div>
-            <div class="sidebar-item-sub">${g.participant_count} members · ${g.message_count_in_store} msgs</div>
+            <div class="sidebar-item-sub">${g.participant_count} members · ${g.message_count_in_store} msgs${g.last_message_time ? ' · ' + relativeTime(g.last_message_time) : ''}</div>
           </div>
         </div>`;
     }
@@ -277,6 +277,110 @@ async function loadMessages() {
   }
 
   container.innerHTML = html;
+
+  // Scroll to bottom to show most recent messages
+  requestAnimationFrame(() => {
+    container.scrollTop = container.scrollHeight;
+  });
+}
+
+// ==================== REMINDERS POPUP ====================
+async function showRemindersPopup() {
+  const crm = await apiGet('/api/crm');
+  const allReminders = crm.reminders || [];
+
+  // Build modal overlay
+  let overlay = document.getElementById('reminders-overlay');
+  if (overlay) overlay.remove();
+
+  overlay = document.createElement('div');
+  overlay.id = 'reminders-overlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  const pending = allReminders.filter(r => r.status === 'pending');
+  const overdue = pending.filter(r => new Date(r.due_at) < new Date());
+  const upcoming = pending.filter(r => new Date(r.due_at) >= new Date());
+  const completed = allReminders.filter(r => r.status === 'done').slice(0, 10);
+  const cancelled = allReminders.filter(r => r.status === 'cancelled').slice(0, 5);
+
+  let html = `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);width:520px;max-height:80vh;overflow-y:auto;padding:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:rgba(245,158,11,0.15);border-radius:8px;color:var(--accent);">${ICONS.clock}</div>
+        <h3 style="margin:0;font-size:16px;font-weight:600;color:var(--text-primary);">All Reminders</h3>
+      </div>
+      <span onclick="document.getElementById('reminders-overlay').remove()" style="cursor:pointer;color:var(--text-dim);width:24px;height:24px;">${ICONS.x}</span>
+    </div>
+    <div style="padding:16px 20px;">`;
+
+  if (allReminders.length === 0) {
+    html += '<div style="text-align:center;color:var(--text-dim);padding:32px 0;">No reminders yet</div>';
+  }
+
+  // Overdue
+  if (overdue.length > 0) {
+    html += '<div style="font-size:12px;font-weight:600;color:var(--danger);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">Overdue</div>';
+    for (const r of overdue) {
+      const contactName = r.contact_name || formatPhone(r.target_jid || '');
+      html += `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:13px;color:var(--text-primary);font-weight:500;">${escHtml(r.text)}</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${contactName ? escHtml(contactName) + ' · ' : ''}Due: ${new Date(r.due_at).toLocaleString()}</div>
+        <div style="margin-top:6px;display:flex;gap:6px;">
+          <button class="btn btn-sm btn-success" onclick="completeReminderPopup('${r.id}')">Complete</button>
+          <button class="btn btn-sm btn-danger" onclick="cancelReminderPopup('${r.id}')">Cancel</button>
+        </div>
+      </div>`;
+    }
+  }
+
+  // Upcoming
+  if (upcoming.length > 0) {
+    html += '<div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px;margin-top:12px;text-transform:uppercase;letter-spacing:0.5px;">Upcoming</div>';
+    for (const r of upcoming) {
+      const contactName = r.contact_name || formatPhone(r.target_jid || '');
+      html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:13px;color:var(--text-primary);font-weight:500;">${escHtml(r.text)}</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${contactName ? escHtml(contactName) + ' · ' : ''}Due: ${new Date(r.due_at).toLocaleString()}</div>
+        <div style="margin-top:6px;display:flex;gap:6px;">
+          <button class="btn btn-sm btn-success" onclick="completeReminderPopup('${r.id}')">Complete</button>
+          <button class="btn btn-sm btn-danger" onclick="cancelReminderPopup('${r.id}')">Cancel</button>
+        </div>
+      </div>`;
+    }
+  }
+
+  // Completed (collapsed)
+  if (completed.length > 0) {
+    html += '<div style="font-size:12px;font-weight:600;color:var(--success);margin-bottom:8px;margin-top:12px;text-transform:uppercase;letter-spacing:0.5px;">Completed (last 10)</div>';
+    for (const r of completed) {
+      const contactName = r.contact_name || formatPhone(r.target_jid || '');
+      html += `<div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px;opacity:0.6;">
+        <div style="font-size:13px;color:var(--text-muted);text-decoration:line-through;">${escHtml(r.text)}</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">${contactName ? escHtml(contactName) + ' · ' : ''}${new Date(r.due_at).toLocaleString()}</div>
+      </div>`;
+    }
+  }
+
+  html += '</div></div>';
+  overlay.innerHTML = html;
+  document.body.appendChild(overlay);
+}
+
+async function completeReminderPopup(id) {
+  await apiPost(`/api/crm/reminder/${id}/complete`);
+  showToast('Reminder completed');
+  showRemindersPopup(); // Refresh popup
+  loadStats();
+  if (selectedTarget) loadCRMPanel();
+}
+
+async function cancelReminderPopup(id) {
+  await apiPost(`/api/crm/reminder/${id}/cancel`);
+  showToast('Reminder cancelled');
+  showRemindersPopup(); // Refresh popup
+  loadStats();
+  if (selectedTarget) loadCRMPanel();
 }
 
 // ==================== AGENT PANEL ====================
@@ -588,6 +692,7 @@ async function loadCRMPanel() {
 
   // Profile header
   const profileName = selectedTarget.name;
+  const autoReplyMode = profile?.auto_reply || 'default';
   html += `
     <div class="crm-profile">
       ${avatarHtml(profileName, 64)}
@@ -595,6 +700,28 @@ async function loadCRMPanel() {
       <div class="crm-profile-phone">${formatPhone(selectedTarget.jid)}</div>
       ${profile?.last_interaction ? `<div class="crm-profile-last">Last interaction: ${relativeTime(profile.last_interaction)}</div>` : ''}
     </div>`;
+
+  // Auto-reply toggle per contact
+  const isPrivateChat = !selectedTarget.jid.endsWith('@g.us');
+  if (isPrivateChat) {
+    html += `<div class="crm-section">
+      <div class="crm-section-header">
+        <div class="crm-section-icon cyan">${ICONS.send}</div>
+        <div class="crm-section-title">Ted Auto-Reply</div>
+      </div>
+      <div class="crm-section-body">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn btn-sm ${autoReplyMode === 'on' ? 'btn-success' : 'btn-secondary'}" onclick="setContactAutoReply('on')" style="min-width:60px;">On</button>
+          <button class="btn btn-sm ${autoReplyMode === 'off' ? 'btn-danger' : 'btn-secondary'}" onclick="setContactAutoReply('off')" style="min-width:60px;">Off</button>
+          <button class="btn btn-sm ${autoReplyMode === 'default' ? 'btn-primary' : 'btn-secondary'}" onclick="setContactAutoReply('default')" style="min-width:80px;">Default</button>
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">
+          ${autoReplyMode === 'on' ? 'Ted will always reply to this contact' :
+            autoReplyMode === 'off' ? 'Ted will never reply to this contact' :
+            'Using global setting'}
+        </div>
+      </div></div>`;
+  }
 
   // Tags section
   html += `<div class="crm-section">
@@ -814,6 +941,20 @@ async function cancelReminder(id) {
   showToast('Reminder cancelled');
   loadCRMPanel();
   loadStats();
+}
+
+async function setContactAutoReply(mode) {
+  if (!selectedTarget) return;
+  await apiPost('/api/crm/auto-reply', {
+    jid: selectedTarget.jid,
+    mode,
+    name: selectedTarget.name,
+  });
+  const label = mode === 'on' ? 'Auto-reply ON for this contact' :
+                mode === 'off' ? 'Auto-reply OFF for this contact' :
+                'Auto-reply set to default';
+  showToast(label);
+  loadCRMPanel();
 }
 
 // ==================== RIGHT PANEL TABS ====================

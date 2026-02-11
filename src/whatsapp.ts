@@ -5,6 +5,7 @@ import makeWASocket, {
   type WASocket,
   type GroupMetadata,
   type proto,
+  type Contact,
 } from '@whiskeysockets/baileys';
 // USyncQuery etc. available but WhatsApp doesn't expose saved contact names via web protocol
 import { Boom } from '@hapi/boom';
@@ -12,6 +13,7 @@ import pino from 'pino';
 import qrcode from 'qrcode-terminal';
 import fs from 'fs';
 import path from 'path';
+import { getAutoReplyForContact } from './crm.js';
 
 
 export type WAMessage = proto.IWebMessageInfo;
@@ -22,6 +24,259 @@ const log = (...args: unknown[]) => console.error('[whatsapp]', ...args);
 const AUTH_DIR = './auth_info';
 const STORE_FILE = './store/message-store.json';
 const STORE_FLUSH_INTERVAL = 30_000;
+const AUTO_REPLY_FILE = './store/auto-reply.json';
+
+// Auto-reply configuration
+interface AutoReplyConfig {
+  enabled: boolean;
+  privateOnly: boolean;  // only reply to private chats (not groups)
+  groupJids: string[];   // specific group JIDs to auto-reply in (if privateOnly is false)
+}
+
+let autoReplyConfig: AutoReplyConfig = { enabled: false, privateOnly: true, groupJids: [] };
+
+// Restore auto-reply config
+if (fs.existsSync(AUTO_REPLY_FILE)) {
+  try {
+    autoReplyConfig = JSON.parse(fs.readFileSync(AUTO_REPLY_FILE, 'utf-8'));
+    log(`Auto-reply config restored: enabled=${autoReplyConfig.enabled}`);
+  } catch {}
+}
+
+function saveAutoReplyConfig() {
+  try {
+    const dir = path.dirname(AUTO_REPLY_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(AUTO_REPLY_FILE, JSON.stringify(autoReplyConfig, null, 2));
+  } catch {}
+}
+
+export function getAutoReplyConfig(): AutoReplyConfig { return autoReplyConfig; }
+
+export function setAutoReplyConfig(config: Partial<AutoReplyConfig>) {
+  Object.assign(autoReplyConfig, config);
+  saveAutoReplyConfig();
+  log(`Auto-reply updated: enabled=${autoReplyConfig.enabled}, privateOnly=${autoReplyConfig.privateOnly}`);
+}
+
+// ==================== LID ↔ Phone JID Mapping ====================
+// WhatsApp uses two JID formats: phone-based (@s.whatsapp.net) and anonymous LID (@lid)
+// Messages can arrive on either format. We need to map between them to unify conversations.
+const LID_MAP_FILE = './store/lid-map.json';
+
+// Bidirectional map: lid -> phone JID, phone JID -> lid
+let lidToPhone: Record<string, string> = {};
+let phoneToLid: Record<string, string> = {};
+
+// Restore LID map from file
+if (fs.existsSync(LID_MAP_FILE)) {
+  try {
+    const data = JSON.parse(fs.readFileSync(LID_MAP_FILE, 'utf-8'));
+    lidToPhone = data.lidToPhone || {};
+    phoneToLid = data.phoneToLid || {};
+    log(`LID map restored: ${Object.keys(lidToPhone).length} mappings`);
+  } catch {}
+}
+
+function saveLidMap() {
+  try {
+    const dir = path.dirname(LID_MAP_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(LID_MAP_FILE, JSON.stringify({ lidToPhone, phoneToLid }, null, 2));
+  } catch {}
+}
+
+// Register a LID ↔ Phone mapping from contact data
+function registerLidMapping(lid: string, phoneJid: string) {
+  if (!lid || !phoneJid) return;
+  // Normalize: ensure lid ends with @lid, phoneJid ends with @s.whatsapp.net
+  if (!lid.endsWith('@lid')) return;
+  if (!phoneJid.endsWith('@s.whatsapp.net')) return;
+
+  const existed = lidToPhone[lid];
+  lidToPhone[lid] = phoneJid;
+  phoneToLid[phoneJid] = lid;
+
+  if (!existed) {
+    log(`LID mapping: ${lid} → ${phoneJid}`);
+  }
+}
+
+// Extract LID↔Phone mapping from a Contact object
+function extractLidFromContact(contact: Contact) {
+  const id = contact.id;
+  const lid = contact.lid;
+  const jid = contact.jid;
+
+  // Case 1: id is phone format, lid is available
+  if (id?.endsWith('@s.whatsapp.net') && lid?.endsWith('@lid')) {
+    registerLidMapping(lid, id);
+  }
+  // Case 2: id is LID format, jid is phone format
+  if (id?.endsWith('@lid') && jid?.endsWith('@s.whatsapp.net')) {
+    registerLidMapping(id, jid);
+  }
+  // Case 3: lid and jid both available
+  if (lid?.endsWith('@lid') && jid?.endsWith('@s.whatsapp.net')) {
+    registerLidMapping(lid, jid);
+  }
+}
+
+// Resolve a JID to its preferred phone-based format
+// If it's a LID and we have a mapping, return the phone JID
+// Otherwise return the original JID
+export function resolveJid(jid: string): string {
+  if (!jid) return jid;
+  if (jid.endsWith('@lid') && lidToPhone[jid]) {
+    return lidToPhone[jid];
+  }
+  return jid;
+}
+
+// Get the LID for a phone JID (if known)
+export function getLidForPhone(phoneJid: string): string | undefined {
+  return phoneToLid[phoneJid];
+}
+
+// Get all LID mappings
+export function getLidMap(): { lidToPhone: Record<string, string>; phoneToLid: Record<string, string> } {
+  return { lidToPhone, phoneToLid };
+}
+
+// Expose registerLidMapping for external use (e.g., API endpoints)
+export { registerLidMapping };
+
+// Flush LID map periodically (will be set up with other intervals)
+setInterval(() => { saveLidMap(); }, STORE_FLUSH_INTERVAL);
+
+// Bootstrap LID mappings using onWhatsApp for contacts that only have LID
+export async function bootstrapLidMappings(): Promise<number> {
+  if (!sock) return 0;
+  let count = 0;
+
+  // Find all phone-based JIDs and try to get their LIDs
+  const phoneJids = Object.keys(messageStore)
+    .filter(jid => jid.endsWith('@s.whatsapp.net'))
+    .filter(jid => !phoneToLid[jid]); // Only ones without a LID mapping
+
+  if (phoneJids.length === 0) return 0;
+
+  try {
+    // onWhatsApp returns { jid, exists, lid } for each phone number
+    const results = await (sock as any).onWhatsApp(...phoneJids);
+    if (results && Array.isArray(results)) {
+      for (const result of results) {
+        if (result.jid && result.lid) {
+          const lid = typeof result.lid === 'string' ? result.lid :
+                     result.lid?.id ? result.lid.id : null;
+          if (lid) {
+            registerLidMapping(
+              lid.endsWith('@lid') ? lid : `${lid}@lid`,
+              result.jid.endsWith('@s.whatsapp.net') ? result.jid : `${result.jid}@s.whatsapp.net`
+            );
+            count++;
+          }
+        }
+      }
+    }
+    if (count > 0) {
+      log(`Bootstrapped ${count} LID mappings via onWhatsApp`);
+      saveLidMap();
+      // Migrate messages from LID JIDs to phone JIDs
+      migrateLidMessages();
+    }
+  } catch (err: any) {
+    log(`LID bootstrap error: ${err.message}`);
+  }
+  return count;
+}
+
+// Migrate messages stored under LID JIDs to their phone JID counterparts
+function migrateLidMessages() {
+  let migrated = 0;
+  for (const [lid, phoneJid] of Object.entries(lidToPhone)) {
+    if (messageStore[lid] && messageStore[lid].length > 0) {
+      if (!messageStore[phoneJid]) messageStore[phoneJid] = [];
+      for (const msg of messageStore[lid]) {
+        const exists = messageStore[phoneJid].some(m => m.key.id === msg.key.id);
+        if (!exists) {
+          messageStore[phoneJid].push(msg);
+          migrated++;
+        }
+      }
+      log(`Migrated ${messageStore[lid].length} messages from ${lid} → ${phoneJid}`);
+      delete messageStore[lid];
+    }
+  }
+  if (migrated > 0) log(`Total messages migrated: ${migrated}`);
+}
+
+// Ted auto-reply handler
+async function handleAutoReply(msg: WAMessage) {
+  if (msg.key.fromMe) return;
+
+  const rawJid = msg.key.remoteJid;
+  if (!rawJid) return;
+
+  // Resolve LID to phone JID if possible
+  const jid = resolveJid(rawJid);
+
+  const isGroup = jid.endsWith('@g.us');
+  const isLid = rawJid.endsWith('@lid');
+
+  // Check per-contact auto-reply override first
+  const contactAutoReply = getAutoReplyForContact(jid);
+  if (contactAutoReply === 'off') {
+    // This contact has auto-reply explicitly disabled
+    return;
+  }
+  if (contactAutoReply === 'on') {
+    // This contact has auto-reply explicitly enabled - skip global checks
+    // (but still check group logic below)
+  } else {
+    // No per-contact override - use global config
+    if (!autoReplyConfig.enabled) return;
+  }
+
+  // Check if we should reply to this chat
+  // LID JIDs are private chats (not groups)
+  if (autoReplyConfig.privateOnly && isGroup) return;
+  if (!autoReplyConfig.privateOnly && isGroup && !autoReplyConfig.groupJids.includes(jid)) return;
+
+  // Get message text
+  const m = msg.message;
+  if (!m) return;
+  const text = m.conversation || m.extendedTextMessage?.text || '';
+  if (!text || text.length < 1) return;
+
+  // Don't reply to status updates
+  if (jid === 'status@broadcast' || rawJid === 'status@broadcast') return;
+
+  // Use the phone JID for sending replies (Ted needs to reply to the right JID)
+  // If we only have a LID and no phone mapping, use the LID directly
+  const replyJid = jid;
+  log(`[auto-reply] Incoming from ${rawJid}${rawJid !== jid ? ` (resolved: ${jid})` : ''}: "${text.substring(0, 50)}..."`);
+
+  // Call Ted API on localhost
+  try {
+    const response = await fetch('http://localhost:3777/api/ted-respond', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jid: replyJid,
+        instruction: `Someone sent this message: "${text}". Reply naturally as Ted, the AI assistant. Be helpful and friendly.`,
+      }),
+    });
+    const result = await response.json();
+    if (result.success) {
+      log(`[auto-reply] Replied to ${replyJid}`);
+    } else {
+      log(`[auto-reply] Failed: ${result.error}`);
+    }
+  } catch (err: any) {
+    log(`[auto-reply] Error: ${err.message}`);
+  }
+}
 
 // Custom in-memory message store: jid -> WAMessage[]
 const messageStore: Record<string, WAMessage[]> = {};
@@ -398,9 +653,13 @@ export async function connectWhatsApp(): Promise<WASocket> {
     syncFullHistory: true,
     defaultQueryTimeoutMs: 120_000,
     getMessage: async (key) => {
-      const jid = key.remoteJid;
-      if (!jid || !messageStore[jid]) return undefined;
-      const msg = messageStore[jid].find((m) => m.key.id === key.id);
+      const rawJid = key.remoteJid;
+      if (!rawJid) return undefined;
+      // Try both the raw JID and resolved JID
+      const resolved = resolveJid(rawJid);
+      const messages = messageStore[rawJid] || messageStore[resolved];
+      if (!messages) return undefined;
+      const msg = messages.find((m) => m.key.id === key.id);
       return msg?.message || undefined;
     },
   });
@@ -408,9 +667,30 @@ export async function connectWhatsApp(): Promise<WASocket> {
   sock.ev.on('creds.update', saveCreds);
 
   // Helper to upsert a message into the store
+  // Resolves LID JIDs to phone JIDs when a mapping exists
   function upsertMsg(msg: WAMessage) {
-    const jid = msg.key.remoteJid;
-    if (!jid) return;
+    const rawJid = msg.key.remoteJid;
+    if (!rawJid) return;
+
+    // Resolve LID to phone JID if mapping exists
+    const jid = resolveJid(rawJid);
+
+    // If the JID was resolved from LID, also store under the resolved JID
+    // and merge any existing messages from the LID JID into the phone JID
+    if (rawJid !== jid && rawJid.endsWith('@lid')) {
+      // Migrate existing LID messages to phone JID on first encounter
+      if (messageStore[rawJid] && messageStore[rawJid].length > 0) {
+        if (!messageStore[jid]) messageStore[jid] = [];
+        for (const oldMsg of messageStore[rawJid]) {
+          const exists = messageStore[jid].some((m) => m.key.id === oldMsg.key.id);
+          if (!exists) {
+            messageStore[jid].push(oldMsg);
+          }
+        }
+        log(`Migrated ${messageStore[rawJid].length} messages from ${rawJid} to ${jid}`);
+        delete messageStore[rawJid];
+      }
+    }
 
     if (!messageStore[jid]) {
       messageStore[jid] = [];
@@ -428,34 +708,64 @@ export async function connectWhatsApp(): Promise<WASocket> {
 
   // Listen for contacts updates (synced from WhatsApp)
   sock.ev.on('contacts.upsert', (contacts) => {
-    let phoneSaved = 0, pushSaved = 0;
+    let phoneSaved = 0, pushSaved = 0, lidMapped = 0;
     for (const contact of contacts) {
       const jid = contact.id;
+
+      // Extract LID ↔ Phone mapping from contact data
+      extractLidFromContact(contact as Contact);
+      if (contact.lid || contact.jid) lidMapped++;
+
       // Priority: phone-saved name > verified business name > pushName (notify)
       if (contact.name && jid) {
         saveContactName(jid, contact.name, 'phone');
+        // Also save under the resolved JID
+        const resolved = resolveJid(jid);
+        if (resolved !== jid) saveContactName(resolved, contact.name, 'phone');
         phoneSaved++;
       } else if (contact.verifiedName && jid) {
         saveContactName(jid, contact.verifiedName, 'verified');
+        const resolved = resolveJid(jid);
+        if (resolved !== jid) saveContactName(resolved, contact.verifiedName, 'verified');
       } else if (contact.notify && jid) {
         saveContactName(jid, contact.notify, 'push');
+        const resolved = resolveJid(jid);
+        if (resolved !== jid) saveContactName(resolved, contact.notify, 'push');
         pushSaved++;
       }
     }
-    log(`Contacts synced: ${contacts.length} total, ${phoneSaved} phone-saved names, ${pushSaved} push names`);
+    log(`Contacts synced: ${contacts.length} total, ${phoneSaved} phone-saved, ${pushSaved} push, ${lidMapped} with LID data`);
   });
 
   sock.ev.on('contacts.update', (updates) => {
     for (const update of updates) {
       const jid = update.id;
+
+      // Extract LID mapping from update
+      extractLidFromContact(update as Contact);
+
       // Same priority for updates
       if ((update as any).name && jid) {
         saveContactName(jid, (update as any).name, 'phone');
+        const resolved = resolveJid(jid);
+        if (resolved !== jid) saveContactName(resolved, (update as any).name, 'phone');
       } else if (update.verifiedName && jid) {
         saveContactName(jid, update.verifiedName, 'verified');
+        const resolved = resolveJid(jid);
+        if (resolved !== jid) saveContactName(resolved, update.verifiedName, 'verified');
       } else if (update.notify && jid) {
         saveContactName(jid, update.notify, 'push');
+        const resolved = resolveJid(jid);
+        if (resolved !== jid) saveContactName(resolved, update.notify, 'push');
       }
+    }
+  });
+
+  // Listen for phone number share events (direct LID → Phone mapping)
+  sock.ev.on('chats.phoneNumberShare', (data: any) => {
+    if (data.lid && data.jid) {
+      registerLidMapping(data.lid, data.jid);
+      log(`Phone number shared: ${data.lid} → ${data.jid}`);
     }
   });
 
@@ -467,7 +777,17 @@ export async function connectWhatsApp(): Promise<WASocket> {
         upsertMsg(msg);
         // Extract contact name from incoming messages (low priority - push)
         if (!msg.key.fromMe && msg.pushName && msg.key.remoteJid) {
-          saveContactName(msg.key.remoteJid, msg.pushName, 'push');
+          const rawJid = msg.key.remoteJid;
+          saveContactName(rawJid, msg.pushName, 'push');
+          // Also save under resolved JID
+          const resolved = resolveJid(rawJid);
+          if (resolved !== rawJid) {
+            saveContactName(resolved, msg.pushName, 'push');
+          }
+        }
+        // Auto-reply with Ted (only for real-time messages, not history sync)
+        if (type === 'notify') {
+          handleAutoReply(msg).catch(() => {});
         }
       }
 
@@ -475,8 +795,12 @@ export async function connectWhatsApp(): Promise<WASocket> {
 
     if (events['messages.update']) {
       for (const { key, update } of events['messages.update']) {
-        const jid = key.remoteJid;
-        if (!jid || !messageStore[jid]) continue;
+        const rawJid = key.remoteJid;
+        if (!rawJid) continue;
+        // Check both raw and resolved JIDs
+        const resolved = resolveJid(rawJid);
+        const jid = messageStore[rawJid] ? rawJid : (messageStore[resolved] ? resolved : rawJid);
+        if (!messageStore[jid]) continue;
 
         const idx = messageStore[jid].findIndex((m) => m.key.id === key.id);
         if (idx >= 0) {
@@ -489,15 +813,35 @@ export async function connectWhatsApp(): Promise<WASocket> {
       const { messages, syncType, chats, isLatest, progress } = events['messaging-history.set'];
       let added = 0;
       const jidCounts: Record<string, number> = {};
-      for (const msg of messages) {
-        const jid = msg.key.remoteJid;
-        if (!jid) continue;
 
+      // Extract LID mappings from chat metadata first (so messages can be resolved)
+      if (chats) {
+        for (const chat of chats) {
+          const c = chat as any;
+          if (c.lid && c.id) {
+            // Chat metadata may include both LID and phone JID
+            if (c.id.endsWith('@s.whatsapp.net') && c.lid.endsWith('@lid')) {
+              registerLidMapping(c.lid, c.id);
+            } else if (c.id.endsWith('@lid') && c.lid.endsWith('@s.whatsapp.net')) {
+              registerLidMapping(c.id, c.lid);
+            }
+          }
+        }
+      }
+
+      for (const msg of messages) {
+        const rawJid = msg.key.remoteJid;
+        if (!rawJid) continue;
+
+        // Resolve LID to phone JID
+        const jid = resolveJid(rawJid);
         jidCounts[jid] = (jidCounts[jid] || 0) + 1;
 
         // Extract contact name from history messages (low priority - push)
-        if (!msg.key.fromMe && msg.pushName && jid.endsWith('@s.whatsapp.net')) {
+        // Now works for both @s.whatsapp.net AND @lid JIDs
+        if (!msg.key.fromMe && msg.pushName && (jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid'))) {
           saveContactName(jid, msg.pushName, 'push');
+          if (jid !== rawJid) saveContactName(rawJid, msg.pushName, 'push');
         }
 
         if (!messageStore[jid]) {
@@ -523,13 +867,18 @@ export async function connectWhatsApp(): Promise<WASocket> {
           const phoneName = (chat as any).name;
           const pushNotify = (chat as any).notify;
           const convTitle = (chat as any).conversationTitle;
-          if (chatJid && chatJid.endsWith('@s.whatsapp.net')) {
+          // Now handle both phone JIDs and LID JIDs
+          if (chatJid && (chatJid.endsWith('@s.whatsapp.net') || chatJid.endsWith('@lid'))) {
+            const resolved = resolveJid(chatJid);
             if (phoneName) {
               saveContactName(chatJid, phoneName, 'phone');
+              if (resolved !== chatJid) saveContactName(resolved, phoneName, 'phone');
             } else if (convTitle) {
               saveContactName(chatJid, convTitle, 'chat');
+              if (resolved !== chatJid) saveContactName(resolved, convTitle, 'chat');
             } else if (pushNotify) {
               saveContactName(chatJid, pushNotify, 'push');
+              if (resolved !== chatJid) saveContactName(resolved, pushNotify, 'push');
             }
           }
         }
@@ -590,6 +939,16 @@ export async function connectWhatsApp(): Promise<WASocket> {
           }
         }
       }
+
+      // Bootstrap LID mappings after connection is stable
+      setTimeout(async () => {
+        try {
+          const count = await bootstrapLidMappings();
+          if (count > 0) log(`LID bootstrap complete: ${count} mappings`);
+        } catch (err: any) {
+          log(`LID bootstrap failed: ${err.message}`);
+        }
+      }, 10000);
     } else if (connection === 'connecting') {
       connectionState = 'connecting';
       log('Connecting to WhatsApp...');

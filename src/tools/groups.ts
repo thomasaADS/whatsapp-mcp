@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getGroupCache, getMessageStore } from '../whatsapp.js';
+import { getMessageTimestamp } from '../store.js';
 
 export const listGroupsSchema = z.object({
   search: z.string().optional().describe('Optional search filter for group names'),
@@ -17,15 +18,29 @@ export function listGroups(params: z.infer<typeof listGroupsSchema>) {
       const messages = store[g.id];
       const msgCount = messages ? messages.length : 0;
 
+      // Find latest message timestamp
+      let lastTs = 0;
+      if (messages) {
+        for (const msg of messages) {
+          const ts = getMessageTimestamp(msg);
+          if (ts > lastTs) lastTs = ts;
+        }
+      }
+
       return {
         jid: g.id,
         name: g.subject,
         participant_count: g.participants?.length || 0,
         message_count_in_store: msgCount,
+        last_message_time: lastTs > 0 ? new Date(lastTs).toISOString() : null,
         creation: g.creation ? new Date(g.creation * 1000).toISOString() : null,
       };
     })
-    .sort((a, b) => b.message_count_in_store - a.message_count_in_store);
+    .sort((a, b) => {
+      const aTime = a.last_message_time ? new Date(a.last_message_time).getTime() : 0;
+      const bTime = b.last_message_time ? new Date(b.last_message_time).getTime() : 0;
+      return bTime - aTime;
+    });
 
   return {
     count: groups.length,
